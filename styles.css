@@ -141,7 +141,7 @@ h3 {
 
 .segmented {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
   margin: 0 0 18px;
   padding: 4px;
@@ -166,6 +166,7 @@ h3 {
   color: var(--ink);
   background: transparent;
   cursor: pointer;
+  line-height: 1.15;
 }
 
 .segmented button.is-active {

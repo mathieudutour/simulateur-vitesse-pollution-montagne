@@ -540,14 +540,45 @@ function initVehicleTooltips() {
 
 function getDirectionalRoute(direction) {
   const totalKm = ROUTE.distanceM / 1000;
+  const uphillPoints = ROUTE.pointsUphill.map(([km, lat, lon, elev]) => ({ km, lat, lon, elev }));
+  const downhillPoints = ROUTE.pointsUphill
+    .map(([km, lat, lon, elev]) => ({ km: totalKm - km, lat, lon, elev }))
+    .sort((a, b) => a.km - b.km);
+  const uphillCurves = ROUTE.curvesUphill.map((curve) => ({ ...curve }));
+  const downhillCurves = ROUTE.curvesUphill
+    .map((curve) => ({ ...curve, km: totalKm - curve.km }))
+    .sort((a, b) => a.km - b.km);
+  const uphillMapPoints = ROUTE.mapPointsUphill.map(([lat, lon]) => ({ lat, lon }));
+
   if (direction === "up") {
     return {
       direction,
       label: "Super U Passy -> Maison medicale du Plateau d'Assy",
       distanceM: ROUTE.distanceM,
-      points: ROUTE.pointsUphill.map(([km, lat, lon, elev]) => ({ km, lat, lon, elev })),
-      curves: ROUTE.curvesUphill.map((curve) => ({ ...curve })),
-      mapPoints: ROUTE.mapPointsUphill.map(([lat, lon]) => ({ lat, lon })),
+      points: uphillPoints,
+      curves: uphillCurves,
+      mapPoints: uphillMapPoints,
+    };
+  }
+
+  if (direction === "round") {
+    return {
+      direction,
+      label: "Aller-retour Super U Passy <-> Maison medicale du Plateau d'Assy",
+      distanceM: ROUTE.distanceM * 2,
+      points: [
+        ...uphillPoints,
+        ...downhillPoints.slice(1).map((point) => ({ ...point, km: totalKm + point.km })),
+      ],
+      curves: [
+        ...uphillCurves,
+        ...downhillCurves.map((curve) => ({ ...curve, km: totalKm + curve.km })),
+      ].sort((a, b) => a.km - b.km),
+      mapPoints: [
+        ...uphillMapPoints,
+        ...uphillMapPoints.slice(0, -1).reverse(),
+      ],
+      turnMapIndex: uphillMapPoints.length - 1,
     };
   }
 
@@ -555,15 +586,9 @@ function getDirectionalRoute(direction) {
     direction,
     label: "Maison medicale du Plateau d'Assy -> Super U Passy",
     distanceM: ROUTE.distanceM,
-    points: ROUTE.pointsUphill
-      .map(([km, lat, lon, elev]) => ({ km: totalKm - km, lat, lon, elev }))
-      .sort((a, b) => a.km - b.km),
-    curves: ROUTE.curvesUphill
-      .map((curve) => ({ ...curve, km: totalKm - curve.km }))
-      .sort((a, b) => a.km - b.km),
-    mapPoints: ROUTE.mapPointsUphill
-      .map(([lat, lon]) => ({ lat, lon }))
-      .reverse(),
+    points: downhillPoints,
+    curves: downhillCurves,
+    mapPoints: uphillMapPoints.reverse(),
   };
 }
 
@@ -769,18 +794,44 @@ function kmhToMps(kmh) {
 }
 
 function renderRouteFacts(route) {
-  const elevations = route.points.map((point) => point.elev);
-  const delta = elevations[elevations.length - 1] - elevations[0];
+  const elevation = summarizeElevation(route.points);
+  const oneWayDelta = Math.abs(
+    ROUTE.pointsUphill[ROUTE.pointsUphill.length - 1][3] - ROUTE.pointsUphill[0][3],
+  );
+  const climbLabel = route.direction === "round"
+    ? `+${fmt(oneWayDelta, 0, " m")} / -${fmt(oneWayDelta, 0, " m")}`
+    : `${elevation.delta >= 0 ? "+" : ""}${fmt(elevation.delta, 0, " m")}`;
+  const elevationFact = route.direction === "round"
+    ? `+${fmt(oneWayDelta, 0, " m")} / -${fmt(oneWayDelta, 0, " m")}`
+    : `${elevation.delta >= 0 ? "+" : ""}${fmt(elevation.delta, 0, " m")}`;
+
   document.getElementById("routeDistance").textContent = fmt(route.distanceM / 1000, 2, " km");
-  document.getElementById("routeClimb").textContent = `${delta >= 0 ? "+" : ""}${fmt(delta, 0, " m")}`;
+  document.getElementById("routeClimb").textContent = climbLabel;
   document.getElementById("routeFacts").innerHTML = [
     ["Trajet", route.label],
     ["Distance", fmt(route.distanceM / 1000, 2, " km")],
-    ["Denivele", `${delta >= 0 ? "+" : ""}${fmt(delta, 0, " m")}`],
+    ["Denivele", elevationFact],
     ["Virages", `${route.curves.length} detectes`],
   ]
     .map(([label, value]) => `<div class="fact"><strong>${value}</strong><span>${label}</span></div>`)
     .join("");
+}
+
+function summarizeElevation(points) {
+  let climb = 0;
+  let descent = 0;
+
+  for (let i = 1; i < points.length; i += 1) {
+    const delta = points[i].elev - points[i - 1].elev;
+    if (delta >= 0) climb += delta;
+    else descent += Math.abs(delta);
+  }
+
+  return {
+    delta: points[points.length - 1].elev - points[0].elev,
+    climb,
+    descent,
+  };
 }
 
 function renderMetrics(a, b) {
@@ -1006,6 +1057,16 @@ function drawMap(route) {
   }).join("");
   const start = xy(projected[0]);
   const end = xy(projected[projected.length - 1]);
+  const turn = Number.isInteger(route.turnMapIndex) ? xy(projected[route.turnMapIndex]) : null;
+  const endpoints = route.direction === "round"
+    ? `
+      ${renderEndpointSvg(start, "Depart / arrivee", "#2f7d63", 12, -13)}
+      ${turn ? renderEndpointSvg(turn, "Demi-tour", "#b46b20", 12, 22) : ""}
+    `
+    : `
+      ${renderEndpointSvg(start, "Depart", "#2f7d63", 12, -13)}
+      ${renderEndpointSvg(end, "Arrivee", "#b46b20", 12, 22)}
+    `;
 
   map.innerHTML = `
     ${tileLayer}
@@ -1015,8 +1076,7 @@ function drawMap(route) {
       <polyline points="${path}" fill="none" stroke="#2f7d63" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></polyline>
       ${arrows}
       ${curves}
-      ${renderEndpointSvg(start, "Depart", "#2f7d63", 12, -13)}
-      ${renderEndpointSvg(end, "Arrivee", "#b46b20", 12, 22)}
+      ${endpoints}
       <text x="${width - 32}" y="28" fill="#59635e" font-size="12" font-weight="800">N</text>
       <path d="M${width - 28} 55 L${width - 28} 34 M${width - 28} 34 L${width - 34} 43 M${width - 28} 34 L${width - 22} 43" fill="none" stroke="#59635e" stroke-width="2" stroke-linecap="round"></path>
     </svg>

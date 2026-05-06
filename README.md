@@ -3,6 +3,7 @@
 Prototype web autonome pour explorer l'effet de la vitesse sur la consommation d'essence,
 les emissions de CO2 et les particules hors echappement sur un profil de route de montagne:
 Super U Passy -> maison medicale du Plateau d'Assy par les departementales.
+Le trajet peut etre simule en montee, en descente ou en aller-retour.
 
 Ouvrir `index.html` dans un navigateur. Aucune dependance n'est requise.
 
