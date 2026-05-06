@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vitesse, carburant et particules en route de montagne</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Super U Passy - Maison medicale du Plateau d'Assy</p>
+        <h1>Vitesse, carburant et particules</h1>
+        <p class="lede">
+          Profil de montagne, freinage avant les virages, montee ou descente, avec sources
+          scientifiques rattachees aux formules et aux constantes. Trace par D39, D43,
+          D13 puis D43.
+        </p>
+      </div>
+      <div class="route-badge" aria-label="resume du profil">
+        <strong id="routeDistance">10,24 km</strong>
+        <span id="routeClimb">+442 m</span>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="tool-panel control-panel" aria-labelledby="controls-title">
+        <div class="panel-title">
+          <span class="panel-kicker">Parametres</span>
+          <h2 id="controls-title">Comparer deux conduites</h2>
+        </div>
+
+        <fieldset class="segmented" aria-label="sens du trajet">
+          <legend>Sens</legend>
+          <button type="button" data-direction="down">Descente</button>
+          <button type="button" class="is-active" data-direction="up">Montee</button>
+        </fieldset>
+
+        <fieldset class="vehicle-picker" aria-label="choix du vehicule">
+          <legend>Vehicule</legend>
+          <button type="button" class="is-active" data-vehicle="note">
+            <img
+              src="https://commons.wikimedia.org/wiki/Special:FilePath/Nissan_Note_2013_%28E12%29_%28cropped%29.jpg?width=360"
+              alt=""
+              loading="lazy"
+            />
+            <strong>Nissan Note</strong>
+            <span class="vehicle-type">citadine</span>
+          </button>
+          <button type="button" data-vehicle="suv">
+            <img
+              src="https://commons.wikimedia.org/wiki/Special:FilePath/BMW-X5.jpg?width=360"
+              alt=""
+              loading="lazy"
+            />
+            <strong>BMW X5 4.8is</strong>
+            <span class="vehicle-type">SUV</span>
+          </button>
+          <button type="button" data-vehicle="pickup">
+            <img
+              src="https://commons.wikimedia.org/wiki/Special:FilePath/Dodge_Ram_1500_SLT_2007_%2814335882789%29.jpg?width=360"
+              alt=""
+              loading="lazy"
+            />
+            <strong>Dodge Ram 1500</strong>
+            <span class="vehicle-type">Pick-up</span>
+          </button>
+        </fieldset>
+
+        <div class="control-grid">
+          <label class="control">
+            <span>Vitesse A</span>
+            <output id="speedAOut">45 km/h</output>
+            <input id="speedA" type="range" min="25" max="90" step="1" value="45" />
+          </label>
+
+          <label class="control control-b">
+            <span>Vitesse B</span>
+            <output id="speedBOut">70 km/h</output>
+            <input id="speedB" type="range" min="25" max="90" step="1" value="70" />
+          </label>
+
+          <label class="control">
+            <span>Confort lateral</span>
+            <output id="latOut">1,47 m/s2</output>
+            <input id="latAccel" type="range" min="0.8" max="3.0" step="0.01" value="1.47" />
+          </label>
+
+          <label class="control">
+            <span>Accel. / freinage</span>
+            <output id="longOut">1,50 m/s2</output>
+            <input id="longAccel" type="range" min="0.7" max="3.0" step="0.05" value="1.5" />
+          </label>
+        </div>
+      </section>
+
+      <section class="tool-panel visual-panel" aria-labelledby="profile-title">
+        <div class="panel-title row-title">
+          <div>
+            <span class="panel-kicker">Simulation</span>
+            <h2 id="profile-title">Profil, vitesses et freinage</h2>
+          </div>
+          <div class="legend">
+            <span><i class="swatch swatch-a"></i>A</span>
+            <span><i class="swatch swatch-b"></i>B</span>
+            <span><i class="swatch swatch-brake"></i>freinage</span>
+          </div>
+        </div>
+        <canvas id="profileCanvas" width="1120" height="500" aria-label="profil altimetrique et vitesses"></canvas>
+        <div class="map-block">
+          <div class="map-title">
+            <span>Carte du trace</span>
+            <small>fond OpenStreetMap</small>
+          </div>
+          <div id="mapView" class="map-view" role="img" aria-label="fond de carte OpenStreetMap avec le trace routier">
+            <div class="map-loading">Chargement du fond de carte</div>
+          </div>
+        </div>
+        <div class="route-facts" id="routeFacts"></div>
+      </section>
+
+      <section class="tool-panel result-panel" aria-labelledby="results-title">
+        <div class="panel-title">
+          <span class="panel-kicker">Resultats</span>
+          <h2 id="results-title">Impact estime</h2>
+        </div>
+        <div class="metric-stack" id="metrics"></div>
+        <div class="breakdown" id="breakdown"></div>
+      </section>
+    </main>
+
+    <section class="method-panel" aria-labelledby="method-title">
+      <div class="panel-title row-title">
+        <div>
+          <span class="panel-kicker">Transparence</span>
+          <h2 id="method-title">Formules, constantes et sources</h2>
+        </div>
+        <button class="plain-button" id="resetButton" type="button">Reinitialiser</button>
+      </div>
+      <div class="method-grid">
+        <article>
+          <h3>Modele physique</h3>
+          <p>
+            Le bilan additionne inertie, roulement, aerodynamique et pente. Le carburant est
+            calcule a partir de l'energie positive aux roues divisee par un rendement moteur.
+            Les particules PM10 et PM2,5 suivent la methode EMEP/EEA pour usure pneus,
+            freins et chaussee.
+          </p>
+        </article>
+        <article>
+          <h3>Limites</h3>
+          <p>
+            Ce prototype vulgarise les ordres de grandeur. Il ne remplace pas COPERT, MOVES,
+            des mesures embarquees, ni un releve routier officiel. Les emissions de frein gardent
+            l'ordre de grandeur EMEP/EEA, mais leur total est module par une demande de
+            freinage monotone sur la plage du curseur, pour eviter qu'une conduite plus rapide
+            abaisse artificiellement les particules.
+          </p>
+        </article>
+      </div>
+      <div class="source-layout">
+        <div class="source-table-wrap">
+          <table class="source-table">
+            <thead>
+              <tr>
+                <th>Element</th>
+                <th>Valeur / formule</th>
+                <th>Source</th>
+              </tr>
+            </thead>
+            <tbody id="ledgerRows"></tbody>
+          </table>
+        </div>
+        <div class="source-list" id="sourceList"></div>
+      </div>
+    </section>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

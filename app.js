@@ -1,0 +1,1171 @@
+const SOURCES = [
+  {
+    id: "OSM",
+    title: "OpenStreetMap / Overpass API",
+    url: "https://overpass-api.de/",
+    note: "Geometrie de route assemblee depuis les voies OSM ref D 39, D 43 et D 13.",
+  },
+  {
+    id: "OSMTILES",
+    title: "OpenStreetMap tile server and attribution",
+    url: "https://operations.osmfoundation.org/policies/tiles/",
+    note: "Fond de carte via tile.openstreetmap.org avec attribution visible.",
+  },
+  {
+    id: "OTD",
+    title: "Open Topo Data, EU-DEM 25 m",
+    url: "https://www.opentopodata.org/",
+    note: "Altitudes interrogees sur le jeu europeen eudem25m, source EEA.",
+  },
+  {
+    id: "SUPERU",
+    title: "Magasins U, Super U Passy",
+    url: "https://www.magasins-u.com/magasin/superu-passy",
+    note: "Adresse du point de depart: 91 avenue de Marlioz, 74190 Passy.",
+  },
+  {
+    id: "MED",
+    title: "Ville de Passy, Maison medicale du Plateau d'Assy",
+    url: "https://www.ville-passy-mont-blanc.fr/maison-medicale-du-plateau-dassy-passy/",
+    note: "Adresse du point d'arrivee: 50 place Theophile Vallet, 74190 Passy.",
+  },
+  {
+    id: "DYN",
+    title: "Liu, Feng & Li, Energies 2017",
+    url: "https://www.mdpi.com/1996-1073/10/5/700",
+    note: "Modele longitudinal: inertie, roulement, trainee aerodynamique et pente.",
+  },
+  {
+    id: "AUTOEVO",
+    title: "AutoEvolution, Nissan Note 2013 specifications",
+    url: "https://www.autoevolution.com/cars/nissan-note-2013.html",
+    note: "Masse et Cd du Nissan Note 2013 utilises pour le profil citadine.",
+  },
+  {
+    id: "CARSPECTOR",
+    title: "Carspector, Nissan Note frontal area",
+    url: "https://carspector.com/car/nissan/044571/",
+    note: "Surface frontale estimee du Nissan Note.",
+  },
+  {
+    id: "X5_SPEC",
+    title: "Carspector, BMW X5 4.8is 2004",
+    url: "https://carspector.com/car/BMW/007152/?u=us",
+    note: "Masse, Cd et surface frontale du profil SUV BMW X5 4.8is.",
+  },
+  {
+    id: "RAM_SPEC",
+    title: "CarSpecs, Dodge Ram 1500 SLT/TRX4 2007",
+    url: "https://www.carspecs.us/cars/2007/dodge/ram-1500/19239",
+    note: "Masse et Cd du profil pick-up Dodge Ram 1500 SLT/TRX4 4x4 Quad Cab.",
+  },
+  {
+    id: "RAM_AREA",
+    title: "Carspector, Dodge Ram 1500 2007 frontal area",
+    url: "https://carspector.com/car/Dodge/028593/",
+    note: "Surface frontale estimee pour un Dodge Ram 1500 2007.",
+  },
+  {
+    id: "NHTSA",
+    title: "NHTSA CAFE technical support document, reference vehicles",
+    url: "https://www.nhtsa.gov/sites/nhtsa.gov/files/2021-08/CAFE-NHTSA-2127-AM34-TSD-Complete-web.pdf",
+    note: "Coefficient de resistance au roulement Crr=0,009 repris pour les profils vehicules.",
+  },
+  {
+    id: "BEDDOWS",
+    title: "Beddows & Harrison, Atmospheric Environment 2021",
+    url: "https://research.birmingham.ac.uk/en/publications/pmsub10sub-and-pmsub25sub-emission-factors-for-non-exhaust-partic",
+    note: "Dependance des emissions hors echappement a la masse du vehicule.",
+  },
+  {
+    id: "ISA",
+    title: "International Standard Atmosphere, Cambridge Engineering",
+    url: "https://www-mdp.eng.cam.ac.uk/web/library/enginfo/aerothermal_dvd_only/aero/atmos/",
+    note: "Densite de l'air au niveau mer et acceleration standard de la pesanteur.",
+  },
+  {
+    id: "NAP15",
+    title: "National Academies, SI gasoline engines, 2015",
+    url: "https://www.nationalacademies.org/read/21744/chapter/4",
+    note: "Rendement thermique au frein typique autour de 22 % en conditions FTP.",
+  },
+  {
+    id: "DOE",
+    title: "U.S. DOE AFDC Fuel Properties",
+    url: "https://afdc.energy.gov/fuels/properties?fuels=GS%2CME",
+    note: "Pouvoir calorifique inferieur de l'essence/E10: 112114 a 116090 Btu/gal.",
+  },
+  {
+    id: "EPA",
+    title: "U.S. EPA GHG Equivalencies",
+    url: "https://www.epa.gov/energy/greenhouse-gas-equivalencies-calculator-calculations-and-references",
+    note: "Facteur 8887 g CO2 par gallon d'essence consomme.",
+  },
+  {
+    id: "EMEP",
+    title: "EMEP/EEA Guidebook 2023, tyre and brake wear, update 2025",
+    url: "https://www.eea.europa.eu/en/analysis/publications/emep-eea-guidebook-2023/part-b-sectoral-guidance-chapters/1-energy/1-a-combustion/1-a-3-b-vi",
+    note: "Facteurs TSP et fractions PM10/PM2,5 pour pneus, freins et chaussee.",
+  },
+  {
+    id: "CURVE",
+    title: "FHWA Speed Concepts, horizontal curves",
+    url: "https://highways.dot.gov/safety/speed-management/speed-concepts-informational-guide/chapter-4-engineering-and-technical",
+    note: "Facteur de frottement lateral utilise comme proxy de l'acceleration laterale non compensee.",
+  },
+  {
+    id: "COMFORT",
+    title: "Transportation Research Part F, deceleration comfort, 2025",
+    url: "https://www.sciencedirect.com/science/article/pii/S1369847825002372",
+    note: "Essais passagers: decelerations de -1,5 a -2,5 m/s2 perçues comme confortables et sures.",
+  },
+  {
+    id: "BRAKE",
+    title: "Xu et al., Journal of Hazardous Materials, 2022",
+    url: "https://pubmed.ncbi.nlm.nih.gov/35413517/",
+    note: "Les pertes d'energie cinetique peuvent parametrer les variations de particules de freinage.",
+  },
+  {
+    id: "PHOTO_NOTE",
+    title: "Wikimedia Commons, Nissan Note 2013",
+    url: "https://commons.wikimedia.org/wiki/File:Nissan_Note_2013_(E12)_(cropped).jpg",
+    note: "Photo du Nissan Note, licence Creative Commons.",
+  },
+  {
+    id: "PHOTO_X5",
+    title: "Wikimedia Commons, BMW X5 2004-2006",
+    url: "https://commons.wikimedia.org/wiki/File:BMW-X5.jpg",
+    note: "Photo du BMW X5, domaine public selon la fiche Commons.",
+  },
+  {
+    id: "PHOTO_RAM",
+    title: "Wikimedia Commons, Dodge Ram 1500 SLT 2007",
+    url: "https://commons.wikimedia.org/wiki/File:Dodge_Ram_1500_SLT_2007_(14335882789).jpg",
+    note: "Photo du Dodge Ram 1500, licence Creative Commons.",
+  },
+];
+
+const ROUTE = {
+  distanceM: 10235.1,
+  osrmDistanceM: 10235.1,
+  pointsUphill: [
+    [0, 45.919231, 6.70447, 578.134],
+    [0.2326, 45.919475, 6.70713, 581.447],
+    [0.4652, 45.920241, 6.709928, 585.694],
+    [0.6978, 45.921001, 6.712728, 587.934],
+    [0.9305, 45.922543, 6.712967, 587.307],
+    [1.1631, 45.924459, 6.711872, 589.966],
+    [1.3957, 45.923781, 6.709136, 604.972],
+    [1.6283, 45.924551, 6.710395, 612.919],
+    [1.8609, 45.924635, 6.708924, 626.791],
+    [2.0935, 45.924318, 6.705996, 641.118],
+    [2.3262, 45.923851, 6.703125, 648.805],
+    [2.5588, 45.924034, 6.700336, 666.428],
+    [2.7914, 45.923746, 6.697471, 672.586],
+    [3.024, 45.92434, 6.694885, 685.219],
+    [3.2566, 45.923897, 6.692054, 689.506],
+    [3.4892, 45.9236, 6.689158, 696.367],
+    [3.7219, 45.923556, 6.686203, 700.393],
+    [3.9545, 45.924432, 6.686535, 714.577],
+    [4.1871, 45.925052, 6.687584, 726.822],
+    [4.4197, 45.925743, 6.685386, 753.191],
+    [4.6523, 45.925028, 6.682624, 763.165],
+    [4.8849, 45.925012, 6.679659, 781.977],
+    [5.1176, 45.925979, 6.680234, 801.863],
+    [5.3502, 45.92686, 6.682898, 813.406],
+    [5.5828, 45.928176, 6.685114, 829.929],
+    [5.8154, 45.929359, 6.686142, 851.352],
+    [6.048, 45.929259, 6.683388, 861.881],
+    [6.2806, 45.92847, 6.681038, 876.619],
+    [6.5133, 45.928623, 6.679945, 891.221],
+    [6.7459, 45.930057, 6.68205, 897.352],
+    [6.9785, 45.931992, 6.682246, 938.612],
+    [7.2111, 45.931319, 6.680331, 942.751],
+    [7.4437, 45.931481, 6.678202, 956.736],
+    [7.6763, 45.932474, 6.680505, 973.184],
+    [7.909, 45.933889, 6.682698, 994.065],
+    [8.1416, 45.933117, 6.684687, 982.599],
+    [8.3742, 45.933756, 6.687041, 1003.682],
+    [8.6068, 45.934769, 6.689512, 1018.993],
+    [8.8394, 45.935483, 6.692284, 1025.197],
+    [9.072, 45.936303, 6.694538, 1034.565],
+    [9.3047, 45.936206, 6.697536, 1035.517],
+    [9.5373, 45.936112, 6.700528, 1038.738],
+    [9.7699, 45.936715, 6.703385, 1035.032],
+    [10.0025, 45.937831, 6.705891, 1020.526],
+    [10.2351, 45.939486, 6.707455, 1019.914],
+  ],
+  curvesUphill: [
+    { km: 0.29, angleDeg: 122, radiusM: 185 },
+    { km: 0.72, angleDeg: 100, radiusM: 131 },
+    { km: 1.16, angleDeg: 114, radiusM: 155 },
+    { km: 1.45, angleDeg: 177, radiusM: 71 },
+    { km: 1.69, angleDeg: 179, radiusM: 57 },
+    { km: 2.96, angleDeg: 153, radiusM: 102 },
+    { km: 3.77, angleDeg: 177, radiusM: 52 },
+    { km: 4.03, angleDeg: 168, radiusM: 81 },
+    { km: 4.22, angleDeg: 175, radiusM: 78 },
+    { km: 4.98, angleDeg: 146, radiusM: 74 },
+    { km: 5.78, angleDeg: 169, radiusM: 74 },
+    { km: 6.02, angleDeg: 77, radiusM: 154 },
+    { km: 6.44, angleDeg: 174, radiusM: 25 },
+    { km: 6.73, angleDeg: 81, radiusM: 104 },
+    { km: 7.02, angleDeg: 175, radiusM: 74 },
+    { km: 7.37, angleDeg: 139, radiusM: 103 },
+    { km: 8.01, angleDeg: 145, radiusM: 89 },
+    { km: 8.2, angleDeg: 134, radiusM: 81 },
+    { km: 8.99, angleDeg: 65, radiusM: 217 },
+  ],
+  mapPointsUphill: [
+    [45.919231, 6.70447],
+    [45.919318, 6.706562],
+    [45.919733, 6.708081],
+    [45.920202, 6.709777],
+    [45.920586, 6.711247],
+    [45.920821, 6.712104],
+    [45.921242, 6.713434],
+    [45.921605, 6.713616],
+    [45.923308, 6.712534],
+    [45.924399, 6.711999],
+    [45.924471, 6.71169],
+    [45.923893, 6.710237],
+    [45.923801, 6.708709],
+    [45.924202, 6.708629],
+    [45.92453, 6.70955],
+    [45.924534, 6.710588],
+    [45.92487, 6.7109],
+    [45.924998, 6.710217],
+    [45.924619, 6.708752],
+    [45.924354, 6.707168],
+    [45.924289, 6.705443],
+    [45.924051, 6.703766],
+    [45.923773, 6.702532],
+    [45.924191, 6.70102],
+    [45.92375, 6.699721],
+    [45.923772, 6.698106],
+    [45.923853, 6.697262],
+    [45.924075, 6.69715],
+    [45.924375, 6.695888],
+    [45.924427, 6.694291],
+    [45.924091, 6.693293],
+    [45.923982, 6.691049],
+    [45.923443, 6.688313],
+    [45.923542, 6.686704],
+    [45.923614, 6.686019],
+    [45.923946, 6.685984],
+    [45.92404, 6.686957],
+    [45.924238, 6.687219],
+    [45.924463, 6.685994],
+    [45.924621, 6.685725],
+    [45.92482, 6.685923],
+    [45.925028, 6.687537],
+    [45.925351, 6.687696],
+    [45.925685, 6.686963],
+    [45.925743, 6.685377],
+    [45.925269, 6.684141],
+    [45.925043, 6.682713],
+    [45.924993, 6.681387],
+    [45.925004, 6.679997],
+    [45.925023, 6.678871],
+    [45.925263, 6.678761],
+    [45.925647, 6.679597],
+    [45.92638, 6.681965],
+    [45.927498, 6.683607],
+    [45.927886, 6.684761],
+    [45.928512, 6.685386],
+    [45.928921, 6.685984],
+    [45.929069, 6.686662],
+    [45.929344, 6.686283],
+    [45.929549, 6.684745],
+    [45.929625, 6.684013],
+    [45.929258, 6.683387],
+    [45.928566, 6.682759],
+    [45.928463, 6.681654],
+    [45.928362, 6.680397],
+    [45.928059, 6.679623],
+    [45.928116, 6.679318],
+    [45.928332, 6.679287],
+    [45.92862, 6.679941],
+    [45.929444, 6.681],
+    [45.929804, 6.681841],
+    [45.930044, 6.682046],
+    [45.930489, 6.681883],
+    [45.931646, 6.681804],
+    [45.932088, 6.682382],
+    [45.932282, 6.682199],
+    [45.931537, 6.680962],
+    [45.931, 6.679139],
+    [45.930948, 6.678248],
+    [45.931208, 6.678144],
+    [45.931815, 6.678257],
+    [45.932104, 6.678776],
+    [45.932226, 6.679284],
+    [45.932766, 6.681094],
+    [45.933813, 6.682537],
+    [45.934067, 6.683717],
+    [45.93373, 6.684529],
+    [45.93323, 6.684552],
+    [45.933125, 6.68522],
+    [45.933003, 6.686337],
+    [45.93387, 6.687117],
+    [45.934376, 6.688135],
+    [45.934778, 6.689826],
+    [45.935349, 6.692121],
+    [45.935992, 6.692653],
+    [45.936451, 6.6935],
+    [45.936296, 6.694189],
+    [45.936315, 6.696039],
+    [45.936243, 6.697116],
+    [45.936063, 6.700074],
+    [45.936282, 6.701859],
+    [45.93717, 6.704806],
+    [45.93869, 6.706483],
+    [45.939436, 6.707098],
+    [45.939486, 6.707455],
+  ],
+};
+
+const DEFAULTS = {
+  direction: "up",
+  vehicleId: "note",
+  speedA: 45,
+  speedB: 70,
+  latAccel: 1.47,
+  longAccel: 1.5,
+};
+
+const CONSTANTS = {
+  g: 9.80665,
+  rho: 1.225,
+  gasolineLhvMJPerL: 31.82,
+  co2KgPerL: 8.887 / 3.785411784,
+  tyreTspGKm: 0.0107,
+  brakeTspGKm: 0.0142,
+  roadTspGKm: 0.015,
+  tyrePM10: 0.6,
+  tyrePM25: 0.42,
+  brakePM10: 0.98,
+  brakePM25: 0.39,
+  roadPM10: 0.5,
+  roadPM25: 0.27,
+  pmMinKmh: 25,
+  pmReferenceKmh: 45,
+};
+
+const VEHICLES = {
+  note: {
+    label: "Nissan Note",
+    subtitle: "citadine essence compacte",
+    mass: 1118,
+    cd: 0.3,
+    area: 2.25,
+    crr: 0.009,
+    efficiency: 0.22,
+    sources: ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15", "PHOTO_NOTE"],
+  },
+  suv: {
+    label: "BMW X5 4.8is",
+    subtitle: "SUV essence 2004",
+    mass: 2275,
+    cd: 0.38,
+    area: 2.74,
+    crr: 0.009,
+    efficiency: 0.22,
+    sources: ["X5_SPEC", "NHTSA", "NAP15", "PHOTO_X5"],
+  },
+  pickup: {
+    label: "Dodge Ram 1500",
+    subtitle: "SLT/TRX4 4x4 Quad Cab 2007",
+    mass: 2366,
+    cd: 0.53,
+    area: 3.31,
+    crr: 0.009,
+    efficiency: 0.22,
+    sources: ["RAM_SPEC", "RAM_AREA", "NHTSA", "NAP15", "PHOTO_RAM"],
+  },
+};
+
+const LEDGER = [
+  ["Points de depart et arrivee", "Super U Passy -> Maison medicale du Plateau d'Assy", ["SUPERU", "MED"]],
+  ["Distance routiere", "10,2351 km, geometrie OSM D39 / D43 / D13 / D43", ["OSM"]],
+  ["Fond de carte", "Tuiles https://tile.openstreetmap.org/{z}/{x}/{y}.png", ["OSMTILES"]],
+  ["Altitudes", "45 points EU-DEM 25 m, 578,1 a 1038,7 m", ["OTD"]],
+  ["Virages", "Rayons deduits de la geometrie OSM; v = sqrt(a_lateral x R)", ["OSM", "CURVE"]],
+  ["Bilan des forces", "F = m a + Crr m g cos(theta) + 0,5 rho Cd A v2 + m g sin(theta)", ["DYN"]],
+  ["Cinematique freinage", "v2 = v0 2 + 2 a s", ["DYN", "COMFORT"]],
+  ["Vehicule Nissan Note", "m=1118 kg; Cd=0,30; A=2,25 m2; Crr=0,009; eta=22 %", ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15"]],
+  ["Vehicule BMW X5 4.8is", "m=2275 kg; Cd=0,38; A=2,74 m2; Crr=0,009; eta=22 %", ["X5_SPEC", "NHTSA", "NAP15"]],
+  ["Vehicule Dodge Ram 1500", "m=2366 kg; Cd=0,53; A=3,31 m2; Crr=0,009; eta=22 %", ["RAM_SPEC", "RAM_AREA", "NHTSA", "NAP15"]],
+  ["Photos vehicules", "Images du selecteur, licence indiquee sur chaque fiche Commons", ["PHOTO_NOTE", "PHOTO_X5", "PHOTO_RAM"]],
+  ["Air et gravite", "rho = 1,225 kg/m3; g = 9,80665 m/s2", ["ISA"]],
+  ["Essence", "PCI = 31,82 MJ/L, derive de 112114-116090 Btu/gal", ["DOE"]],
+  ["CO2 essence", "8887 g CO2/gal = 2,35 kg CO2/L", ["EPA"]],
+  ["Pneus", "TSP = 0,0107 g/km x m/m_Note; PM10/TSP = 0,60; PM2,5/TSP = 0,42", ["EMEP", "BEDDOWS"]],
+  ["Freins", "TSP = 0,0142 g/km x m/m_Note x max(1, max_25..V(Efrein + Ecin_perdue)/(Efrein_45 + Ecin_perdue_45)); PM10/TSP = 0,98; PM2,5/TSP = 0,39", ["EMEP", "BRAKE", "BEDDOWS"]],
+  ["Chaussee", "TSP = 0,0150 g/km x m/m_Note; PM10/TSP = 0,50; PM2,5/TSP = 0,27", ["EMEP", "BEDDOWS"]],
+  ["Spatialisation freins", "Part de PM freinage proportionnelle a l'energie dissipee localement", ["BRAKE", "EMEP"]],
+];
+
+const els = {};
+let state = { ...DEFAULTS };
+
+document.addEventListener("DOMContentLoaded", () => {
+  [
+    "speedA",
+    "speedB",
+    "latAccel",
+    "longAccel",
+  ].forEach((id) => {
+    els[id] = document.getElementById(id);
+    els[`${id}Out`] = document.getElementById(`${id}Out`);
+    els[id].addEventListener("input", () => {
+      state[id] = Number(els[id].value);
+      update();
+    });
+  });
+
+  document.querySelectorAll("[data-vehicle]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.vehicleId = button.dataset.vehicle;
+      document.querySelectorAll("[data-vehicle]").forEach((b) => b.classList.remove("is-active"));
+      button.classList.add("is-active");
+      update();
+    });
+  });
+
+  document.querySelectorAll("[data-direction]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.direction = button.dataset.direction;
+      document.querySelectorAll("[data-direction]").forEach((b) => b.classList.remove("is-active"));
+      button.classList.add("is-active");
+      update();
+    });
+  });
+
+  document.getElementById("resetButton").addEventListener("click", () => {
+    state = { ...DEFAULTS };
+    Object.entries(DEFAULTS).forEach(([key, value]) => {
+      if (els[key]) els[key].value = value;
+    });
+    document.querySelectorAll("[data-direction]").forEach((button) => {
+      button.classList.toggle("is-active", button.dataset.direction === state.direction);
+    });
+    document.querySelectorAll("[data-vehicle]").forEach((button) => {
+      button.classList.toggle("is-active", button.dataset.vehicle === state.vehicleId);
+    });
+    update();
+  });
+
+  initVehicleTooltips();
+  renderSources();
+  update();
+});
+
+function update() {
+  syncOutputs();
+  const route = getDirectionalRoute(state.direction);
+  const params = getParams();
+  const scenarioA = simulate(state.speedA, params, route);
+  const scenarioB = simulate(state.speedB, params, route);
+  renderRouteFacts(route);
+  renderMetrics(scenarioA, scenarioB);
+  renderBreakdown(scenarioA, scenarioB);
+  drawProfile(route, scenarioA, scenarioB);
+  drawMap(route);
+}
+
+function syncOutputs() {
+  const fr = new Intl.NumberFormat("fr-FR");
+  document.getElementById("speedAOut").textContent = `${fr.format(state.speedA)} km/h`;
+  document.getElementById("speedBOut").textContent = `${fr.format(state.speedB)} km/h`;
+  document.getElementById("latOut").textContent = `${state.latAccel.toLocaleString("fr-FR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} m/s2`;
+  document.getElementById("longOut").textContent = `${state.longAccel.toLocaleString("fr-FR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} m/s2`;
+}
+
+function getParams() {
+  const vehicle = VEHICLES[state.vehicleId] || VEHICLES.note;
+  return {
+    mass: vehicle.mass,
+    cd: vehicle.cd,
+    area: vehicle.area,
+    crr: vehicle.crr,
+    efficiency: vehicle.efficiency,
+    latAccel: state.latAccel,
+    longAccel: state.longAccel,
+  };
+}
+
+function initVehicleTooltips() {
+  document.querySelectorAll("[data-vehicle]").forEach((button) => {
+    const vehicle = VEHICLES[button.dataset.vehicle];
+    if (!vehicle) return;
+
+    const specs = [
+      ["Masse", fmt(vehicle.mass, 0, " kg")],
+      ["Cd", fmt(vehicle.cd, 2, "")],
+      ["Surface", fmt(vehicle.area, 2, " m2")],
+      ["Crr", fmt(vehicle.crr, 3, "")],
+      ["Rendement", fmt(vehicle.efficiency * 100, 0, " %")],
+      ["Sources", vehicle.sources.join(" / ")],
+    ];
+    const tooltipId = `vehicle-tooltip-${button.dataset.vehicle}`;
+    const tooltip = document.createElement("span");
+    tooltip.className = "vehicle-tooltip";
+    tooltip.id = tooltipId;
+    tooltip.setAttribute("role", "tooltip");
+    tooltip.innerHTML = specs
+      .map(([label, value]) => `
+        <span class="${label === "Sources" ? "is-source" : ""}">
+          <em>${label}</em>
+          <strong>${value}</strong>
+        </span>
+      `)
+      .join("");
+
+    button.appendChild(tooltip);
+    button.setAttribute("aria-describedby", tooltipId);
+    button.setAttribute(
+      "aria-label",
+      `${vehicle.label}, ${vehicle.subtitle}. ${specs.map(([label, value]) => `${label}: ${value}`).join("; ")}`,
+    );
+  });
+}
+
+
+function getDirectionalRoute(direction) {
+  const totalKm = ROUTE.distanceM / 1000;
+  if (direction === "up") {
+    return {
+      direction,
+      label: "Super U Passy -> Maison medicale du Plateau d'Assy",
+      distanceM: ROUTE.distanceM,
+      points: ROUTE.pointsUphill.map(([km, lat, lon, elev]) => ({ km, lat, lon, elev })),
+      curves: ROUTE.curvesUphill.map((curve) => ({ ...curve })),
+      mapPoints: ROUTE.mapPointsUphill.map(([lat, lon]) => ({ lat, lon })),
+    };
+  }
+
+  return {
+    direction,
+    label: "Maison medicale du Plateau d'Assy -> Super U Passy",
+    distanceM: ROUTE.distanceM,
+    points: ROUTE.pointsUphill
+      .map(([km, lat, lon, elev]) => ({ km: totalKm - km, lat, lon, elev }))
+      .sort((a, b) => a.km - b.km),
+    curves: ROUTE.curvesUphill
+      .map((curve) => ({ ...curve, km: totalKm - curve.km }))
+      .sort((a, b) => a.km - b.km),
+    mapPoints: ROUTE.mapPointsUphill
+      .map(([lat, lon]) => ({ lat, lon }))
+      .reverse(),
+  };
+}
+
+function simulate(targetKmh, params, route) {
+  const n = 260;
+  const distanceM = route.distanceM;
+  const target = kmhToMps(targetKmh);
+  const minSpeed = kmhToMps(5);
+  const points = [];
+
+  for (let i = 0; i <= n; i += 1) {
+    const m = (distanceM * i) / n;
+    const km = m / 1000;
+    let v = target;
+
+    route.curves.forEach((curve) => {
+      const curveM = curve.km * 1000;
+      const cap = Math.min(target, Math.sqrt(params.latAccel * curve.radiusM));
+      const gap = Math.abs(curveM - m);
+      const limit = Math.sqrt(cap * cap + 2 * params.longAccel * gap);
+      v = Math.min(v, limit);
+    });
+
+    points.push({
+      km,
+      m,
+      elev: interpolateElevation(route.points, km),
+      speedMps: Math.max(minSpeed, v),
+    });
+  }
+
+  let tractionJ = 0;
+  let brakeJ = 0;
+  let aeroJ = 0;
+  let rollJ = 0;
+  let climbJ = 0;
+  let inertiaJ = 0;
+  let decelJ = 0;
+  let timeS = 0;
+  const brakeBySegment = [];
+
+  for (let i = 0; i < n; i += 1) {
+    const a = points[i];
+    const b = points[i + 1];
+    const ds = b.m - a.m;
+    const dh = b.elev - a.elev;
+    const theta = Math.atan2(dh, ds);
+    const vAvg = Math.max((a.speedMps + b.speedMps) / 2, kmhToMps(3));
+    const acc = (b.speedMps * b.speedMps - a.speedMps * a.speedMps) / (2 * ds);
+
+    const fRoll = params.crr * params.mass * CONSTANTS.g * Math.cos(theta);
+    const fAero = 0.5 * CONSTANTS.rho * params.cd * params.area * vAvg * vAvg;
+    const fGrade = params.mass * CONSTANTS.g * Math.sin(theta);
+    const fInertia = params.mass * acc;
+    const fWheel = fRoll + fAero + fGrade + fInertia;
+
+    tractionJ += Math.max(fWheel, 0) * ds;
+    brakeJ += Math.max(-fWheel, 0) * ds;
+    aeroJ += fAero * ds;
+    rollJ += fRoll * ds;
+    climbJ += Math.max(fGrade, 0) * ds;
+    inertiaJ += Math.max(fInertia, 0) * ds;
+    decelJ += Math.max(-fInertia, 0) * ds;
+    timeS += ds / vAvg;
+    brakeBySegment.push({
+      km: (a.km + b.km) / 2,
+      energyJ: Math.max(-fWheel, 0) * ds,
+    });
+  }
+
+  const fuelEnergyJ = tractionJ / Math.max(params.efficiency, 0.01);
+  const fuelL = fuelEnergyJ / (CONSTANTS.gasolineLhvMJPerL * 1e6);
+  const distanceKm = distanceM / 1000;
+  const avgKmh = (distanceKm / (timeS / 3600));
+  const massScale = params.mass / VEHICLES.note.mass;
+  const brakeDemandJ = brakeJ + decelJ;
+  const brakeEnergyMultiplier = estimateBrakeDemandMultiplier(targetKmh, params, route, brakeDemandJ);
+  const tyreTsp = distanceKm * CONSTANTS.tyreTspGKm * massScale;
+  const brakeTsp = distanceKm * CONSTANTS.brakeTspGKm * massScale * brakeEnergyMultiplier;
+  const roadTsp = distanceKm * CONSTANTS.roadTspGKm * massScale;
+  const pm10G =
+    tyreTsp * CONSTANTS.tyrePM10 +
+    brakeTsp * CONSTANTS.brakePM10 +
+    roadTsp * CONSTANTS.roadPM10;
+  const pm25G =
+    tyreTsp * CONSTANTS.tyrePM25 +
+    brakeTsp * CONSTANTS.brakePM25 +
+    roadTsp * CONSTANTS.roadPM25;
+
+  const brakeTotalPm10Mg = brakeTsp * CONSTANTS.brakePM10 * 1000;
+  const brakeEnergySum = brakeBySegment.reduce((sum, row) => sum + row.energyJ, 0);
+  const brakePmHotspots = brakeBySegment.map((row) => ({
+    km: row.km,
+    mg: brakeEnergySum > 0 ? (row.energyJ / brakeEnergySum) * brakeTotalPm10Mg : 0,
+  }));
+
+  return {
+    targetKmh,
+    points,
+    distanceKm,
+    timeMin: timeS / 60,
+    avgKmh,
+    fuelL,
+    fuelLPer100: (fuelL / distanceKm) * 100,
+    co2Kg: fuelL * CONSTANTS.co2KgPerL,
+    tractionKWh: tractionJ / 3.6e6,
+    brakeKWh: brakeJ / 3.6e6,
+    aeroKWh: aeroJ / 3.6e6,
+    rollKWh: rollJ / 3.6e6,
+    climbKWh: climbJ / 3.6e6,
+    inertiaKWh: inertiaJ / 3.6e6,
+    pm10Mg: pm10G * 1000,
+    pm25Mg: pm25G * 1000,
+    tyrePm10Mg: tyreTsp * CONSTANTS.tyrePM10 * 1000,
+    brakePm10Mg: brakeTotalPm10Mg,
+    roadPm10Mg: roadTsp * CONSTANTS.roadPM10 * 1000,
+    brakeEnergyMultiplier,
+    brakePmHotspots,
+  };
+}
+
+function estimateBrakeDemandMultiplier(targetKmh, params, route, currentDemandJ) {
+  const referenceDemandJ = estimateBrakeDemandOnly(CONSTANTS.pmReferenceKmh, params, route);
+  if (referenceDemandJ <= 1000) return 1;
+
+  let peakDemandJ = Math.max(referenceDemandJ, currentDemandJ);
+  const firstSpeed = CONSTANTS.pmMinKmh;
+  const lastSpeed = Math.max(firstSpeed, Math.ceil(targetKmh));
+
+  for (let speed = firstSpeed; speed <= lastSpeed; speed += 1) {
+    peakDemandJ = Math.max(peakDemandJ, estimateBrakeDemandOnly(speed, params, route));
+  }
+
+  return Math.max(1, peakDemandJ / referenceDemandJ);
+}
+
+function estimateBrakeDemandOnly(targetKmh, params, route) {
+  const n = 260;
+  const distanceM = route.distanceM;
+  const target = kmhToMps(targetKmh);
+  const minSpeed = kmhToMps(5);
+  const points = [];
+
+  for (let i = 0; i <= n; i += 1) {
+    const m = (distanceM * i) / n;
+    const km = m / 1000;
+    let v = target;
+
+    route.curves.forEach((curve) => {
+      const curveM = curve.km * 1000;
+      const cap = Math.min(target, Math.sqrt(params.latAccel * curve.radiusM));
+      const gap = Math.abs(curveM - m);
+      const limit = Math.sqrt(cap * cap + 2 * params.longAccel * gap);
+      v = Math.min(v, limit);
+    });
+
+    points.push({
+      km,
+      m,
+      elev: interpolateElevation(route.points, km),
+      speedMps: Math.max(minSpeed, v),
+    });
+  }
+
+  let brakeJ = 0;
+  let decelJ = 0;
+  for (let i = 0; i < n; i += 1) {
+    const a = points[i];
+    const b = points[i + 1];
+    const ds = b.m - a.m;
+    const dh = b.elev - a.elev;
+    const theta = Math.atan2(dh, ds);
+    const vAvg = Math.max((a.speedMps + b.speedMps) / 2, kmhToMps(3));
+    const acc = (b.speedMps * b.speedMps - a.speedMps * a.speedMps) / (2 * ds);
+    const fRoll = params.crr * params.mass * CONSTANTS.g * Math.cos(theta);
+    const fAero = 0.5 * CONSTANTS.rho * params.cd * params.area * vAvg * vAvg;
+    const fGrade = params.mass * CONSTANTS.g * Math.sin(theta);
+    const fInertia = params.mass * acc;
+    brakeJ += Math.max(-(fRoll + fAero + fGrade + fInertia), 0) * ds;
+    decelJ += Math.max(-fInertia, 0) * ds;
+  }
+
+  return brakeJ + decelJ;
+}
+
+function interpolateElevation(points, km) {
+  if (km <= points[0].km) return points[0].elev;
+  const last = points[points.length - 1];
+  if (km >= last.km) return last.elev;
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const a = points[i];
+    const b = points[i + 1];
+    if (km >= a.km && km <= b.km) {
+      const t = (km - a.km) / (b.km - a.km);
+      return a.elev + (b.elev - a.elev) * t;
+    }
+  }
+  return last.elev;
+}
+
+function kmhToMps(kmh) {
+  return kmh / 3.6;
+}
+
+function renderRouteFacts(route) {
+  const elevations = route.points.map((point) => point.elev);
+  const delta = elevations[elevations.length - 1] - elevations[0];
+  document.getElementById("routeDistance").textContent = fmt(route.distanceM / 1000, 2, " km");
+  document.getElementById("routeClimb").textContent = `${delta >= 0 ? "+" : ""}${fmt(delta, 0, " m")}`;
+  document.getElementById("routeFacts").innerHTML = [
+    ["Trajet", route.label],
+    ["Distance", fmt(route.distanceM / 1000, 2, " km")],
+    ["Denivele", `${delta >= 0 ? "+" : ""}${fmt(delta, 0, " m")}`],
+    ["Virages", `${route.curves.length} detectes`],
+  ]
+    .map(([label, value]) => `<div class="fact"><strong>${value}</strong><span>${label}</span></div>`)
+    .join("");
+}
+
+function renderMetrics(a, b) {
+  const rows = [
+    ["Carburant", "fuelL", " L", 2, true],
+    ["Consommation", "fuelLPer100", " L/100 km", 1, true],
+    ["CO2 echappement", "co2Kg", " kg", 2, true],
+    ["PM10 hors echappement", "pm10Mg", " mg", 0, true],
+    ["PM2,5 hors echappement", "pm25Mg", " mg", 0, true],
+    ["Energie freinee", "brakeKWh", " kWh", 2, true],
+    ["Temps", "timeMin", " min", 1, false],
+    ["Vitesse moyenne", "avgKmh", " km/h", 1, false],
+  ];
+
+  document.getElementById("metrics").innerHTML = rows
+    .map(([label, key, unit, digits, lowerIsBetter]) => metricTemplate(label, a, b, key, unit, digits, lowerIsBetter))
+    .join("");
+}
+
+function metricTemplate(label, a, b, key, unit, digits, lowerIsBetter) {
+  const delta = b[key] - a[key];
+  const pct = a[key] === 0 ? 0 : (delta / a[key]) * 100;
+  const worse = lowerIsBetter ? delta > 0 : delta < 0;
+  const sign = delta > 0 ? "+" : "";
+  return `
+    <article class="metric">
+      <div class="metric-head">
+        <span>${label}</span>
+        <span class="delta ${worse ? "is-worse" : ""}">${sign}${fmt(pct, 0, " %")}</span>
+      </div>
+      <div class="metric-values">
+        <div><strong>${fmt(a[key], digits, unit)}</strong><span>A ${fmt(a.targetKmh, 0, " km/h")}</span></div>
+        <div><strong>${fmt(b[key], digits, unit)}</strong><span>B ${fmt(b.targetKmh, 0, " km/h")}</span></div>
+      </div>
+    </article>
+  `;
+}
+
+function renderBreakdown(a, b) {
+  const energyA = a.aeroKWh + a.rollKWh + a.climbKWh + a.inertiaKWh;
+  const energyB = b.aeroKWh + b.rollKWh + b.climbKWh + b.inertiaKWh;
+  const maxEnergy = Math.max(energyA, energyB, 0.01);
+  const pmRows = [
+    ["Pneus", a.tyrePm10Mg, b.tyrePm10Mg],
+    ["Freins", a.brakePm10Mg, b.brakePm10Mg],
+    ["Chaussee", a.roadPm10Mg, b.roadPm10Mg],
+  ];
+  const maxPm = Math.max(...pmRows.flatMap(([, valueA, valueB]) => [valueA, valueB]), 1);
+  document.getElementById("breakdown").innerHTML = `
+    <section class="breakdown-section">
+      <div class="breakdown-title">
+        <span>Energie positive aux roues</span>
+        <small>kWh</small>
+      </div>
+      <div class="vertical-chart energy-chart">
+        ${verticalBar(`A ${fmt(a.targetKmh, 0, " km/h")}`, energyA, maxEnergy, " kWh", 2, "a")}
+        ${verticalBar(`B ${fmt(b.targetKmh, 0, " km/h")}`, energyB, maxEnergy, " kWh", 2, "b")}
+      </div>
+    </section>
+
+    <section class="breakdown-section">
+      <div class="breakdown-title">
+        <span>PM10 hors echappement</span>
+        <small>mg</small>
+      </div>
+      <div class="vertical-chart pm-chart">
+        ${pmRows.map(([label, valueA, valueB]) => `
+          <div class="bar-pair">
+            ${verticalBar(`A ${fmt(a.targetKmh, 0, " km/h")}`, valueA, maxPm, " mg", 0, "a")}
+            ${verticalBar(`B ${fmt(b.targetKmh, 0, " km/h")}`, valueB, maxPm, " mg", 0, "b")}
+            <strong>${label}</strong>
+          </div>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function verticalBar(label, value, max, unit, digits, scenario) {
+  const height = Math.max(4, Math.min(100, (value / max) * 100));
+  return `
+    <div class="vertical-bar scenario-${scenario}">
+      <span>${fmt(value, digits, unit)}</span>
+      <div class="vertical-track">
+        <div class="vertical-fill" style="height:${height}%"></div>
+      </div>
+      <em>${label}</em>
+    </div>
+  `;
+}
+
+function drawProfile(route, a, b) {
+  const canvas = document.getElementById("profileCanvas");
+  const rect = canvas.getBoundingClientRect();
+  const ratio = window.devicePixelRatio || 1;
+  canvas.width = Math.floor(rect.width * ratio);
+  canvas.height = Math.floor(rect.height * ratio);
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  const width = rect.width;
+  const height = rect.height;
+  const pad = { top: 28, right: 58, bottom: 44, left: 56 };
+  const innerW = width - pad.left - pad.right;
+  const innerH = height - pad.top - pad.bottom;
+  const allElev = route.points.map((p) => p.elev);
+  const minElev = Math.floor((Math.min(...allElev) - 20) / 20) * 20;
+  const maxElev = Math.ceil((Math.max(...allElev) + 20) / 20) * 20;
+  const maxSpeed = Math.max(state.speedA, state.speedB, 90);
+  const totalKm = route.distanceM / 1000;
+
+  const x = (km) => pad.left + (km / totalKm) * innerW;
+  const yElev = (elev) => pad.top + (1 - (elev - minElev) / (maxElev - minElev)) * innerH;
+  const ySpeed = (mps) => pad.top + (1 - (mps * 3.6) / maxSpeed) * innerH;
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = "#fbf8f1";
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.strokeStyle = "#e0d8ca";
+  ctx.lineWidth = 1;
+  ctx.fillStyle = "#7a827d";
+  ctx.font = "12px Inter, system-ui, sans-serif";
+  for (let i = 0; i <= 4; i += 1) {
+    const yy = pad.top + (i / 4) * innerH;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, yy);
+    ctx.lineTo(width - pad.right, yy);
+    ctx.stroke();
+    const elev = maxElev - ((maxElev - minElev) * i) / 4;
+    ctx.fillText(`${Math.round(elev)} m`, 8, yy + 4);
+    const speed = Math.round(maxSpeed - (maxSpeed * i) / 4);
+    ctx.fillText(`${speed}`, width - 36, yy + 4);
+  }
+
+  const hotspotMax = Math.max(...b.brakePmHotspots.map((p) => p.mg), 0.001);
+  b.brakePmHotspots.forEach((p) => {
+    const alpha = Math.min(0.48, p.mg / hotspotMax);
+    if (alpha <= 0.02) return;
+    ctx.fillStyle = `rgba(181, 72, 63, ${alpha})`;
+    ctx.fillRect(x(p.km) - 1.5, pad.top, 3, innerH);
+  });
+
+  ctx.beginPath();
+  route.points.forEach((point, index) => {
+    const xx = x(point.km);
+    const yy = yElev(point.elev);
+    if (index === 0) ctx.moveTo(xx, yy);
+    else ctx.lineTo(xx, yy);
+  });
+  ctx.lineTo(x(totalKm), pad.top + innerH);
+  ctx.lineTo(x(0), pad.top + innerH);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(47, 125, 99, 0.12)";
+  ctx.fill();
+
+  drawLine(ctx, route.points, (p) => x(p.km), (p) => yElev(p.elev), "#51635b", 2);
+  drawLine(ctx, a.points, (p) => x(p.km), (p) => ySpeed(p.speedMps), "#2f7d63", 3);
+  drawLine(ctx, b.points, (p) => x(p.km), (p) => ySpeed(p.speedMps), "#246f9e", 3);
+
+  route.curves.forEach((curve) => {
+    const xx = x(curve.km);
+    ctx.strokeStyle = "rgba(180, 107, 32, 0.7)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(xx, pad.top + innerH - 12);
+    ctx.lineTo(xx, pad.top + innerH + 6);
+    ctx.stroke();
+    ctx.fillStyle = "#b46b20";
+    ctx.beginPath();
+    ctx.arc(xx, pad.top + innerH - 14, Math.max(3, Math.min(7, curve.angleDeg / 26)), 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  ctx.strokeStyle = "#bdb4a6";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(pad.left, pad.top, innerW, innerH);
+  ctx.fillStyle = "#59635e";
+  ctx.fillText("distance", pad.left + innerW / 2 - 22, height - 14);
+  ctx.fillText("km/h", width - 36, pad.top - 8);
+}
+
+function drawMap(route) {
+  const map = document.getElementById("mapView");
+  const rect = map.getBoundingClientRect();
+  const width = rect.width;
+  const height = rect.height;
+  if (!width || !height) return;
+
+  const points = route.mapPoints;
+  const zoom = chooseTileZoom(points, width, height);
+  const projected = points.map((p) => projectTilePoint(p.lat, p.lon, zoom));
+  const minX = Math.min(...projected.map((p) => p.x));
+  const maxX = Math.max(...projected.map((p) => p.x));
+  const minY = Math.min(...projected.map((p) => p.y));
+  const maxY = Math.max(...projected.map((p) => p.y));
+  const center = {
+    x: (minX + maxX) / 2,
+    y: (minY + maxY) / 2,
+  };
+  const origin = {
+    x: center.x - width / 2,
+    y: center.y - height / 2,
+  };
+  const xy = (p) => ({
+    x: p.x - origin.x,
+    y: p.y - origin.y,
+  });
+
+  const tileLayer = renderTileLayer(origin, width, height, zoom);
+  const path = projected.map((point) => {
+    const pos = xy(point);
+    return `${pos.x.toFixed(1)},${pos.y.toFixed(1)}`;
+  }).join(" ");
+  const arrows = renderMapArrows(projected, xy);
+  const curves = route.curves.map((curve) => {
+    const point = pointAtRouteFraction(projected, curve.km / (route.distanceM / 1000));
+    const pos = xy(point);
+    const radius = Math.max(8, Math.min(18, curve.angleDeg / 8));
+    return `
+      <circle cx="${pos.x.toFixed(1)}" cy="${pos.y.toFixed(1)}" r="${radius.toFixed(1)}" fill="rgba(180, 107, 32, 0.2)"></circle>
+      <circle cx="${pos.x.toFixed(1)}" cy="${pos.y.toFixed(1)}" r="4" fill="#b46b20"></circle>
+    `;
+  }).join("");
+  const start = xy(projected[0]);
+  const end = xy(projected[projected.length - 1]);
+
+  map.innerHTML = `
+    ${tileLayer}
+    <svg viewBox="0 0 ${width} ${height}" aria-hidden="true">
+      <polyline points="${path}" fill="none" stroke="rgba(29,37,34,0.32)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"></polyline>
+      <polyline points="${path}" fill="none" stroke="#fffdf8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></polyline>
+      <polyline points="${path}" fill="none" stroke="#2f7d63" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></polyline>
+      ${arrows}
+      ${curves}
+      ${renderEndpointSvg(start, "Depart", "#2f7d63", 12, -13)}
+      ${renderEndpointSvg(end, "Arrivee", "#b46b20", 12, 22)}
+      <text x="${width - 32}" y="28" fill="#59635e" font-size="12" font-weight="800">N</text>
+      <path d="M${width - 28} 55 L${width - 28} 34 M${width - 28} 34 L${width - 34} 43 M${width - 28} 34 L${width - 22} 43" fill="none" stroke="#59635e" stroke-width="2" stroke-linecap="round"></path>
+    </svg>
+    <div class="map-attribution">
+      <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors</a>
+    </div>
+  `;
+}
+
+function chooseTileZoom(points, width, height) {
+  const padding = 8;
+  for (let zoom = 17; zoom >= 12; zoom -= 1) {
+    const projected = points.map((p) => projectTilePoint(p.lat, p.lon, zoom));
+    const minX = Math.min(...projected.map((p) => p.x));
+    const maxX = Math.max(...projected.map((p) => p.x));
+    const minY = Math.min(...projected.map((p) => p.y));
+    const maxY = Math.max(...projected.map((p) => p.y));
+    if (maxX - minX <= width - padding * 2 && maxY - minY <= height - padding * 2) {
+      return zoom;
+    }
+  }
+  return 12;
+}
+
+function projectTilePoint(lat, lon, zoom) {
+  const tileSize = 256;
+  const scale = tileSize * 2 ** zoom;
+  const latRad = (lat * Math.PI) / 180;
+  return {
+    x: ((lon + 180) / 360) * scale,
+    y: ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * scale,
+  };
+}
+
+function renderTileLayer(origin, width, height, zoom) {
+  const tileSize = 256;
+  const maxTile = 2 ** zoom;
+  const startX = Math.floor(origin.x / tileSize);
+  const endX = Math.floor((origin.x + width) / tileSize);
+  const startY = Math.floor(origin.y / tileSize);
+  const endY = Math.floor((origin.y + height) / tileSize);
+  const tiles = [];
+  for (let x = startX; x <= endX; x += 1) {
+    for (let y = startY; y <= endY; y += 1) {
+      if (y < 0 || y >= maxTile) continue;
+      const wrappedX = ((x % maxTile) + maxTile) % maxTile;
+      const left = Math.round(x * tileSize - origin.x);
+      const top = Math.round(y * tileSize - origin.y);
+      tiles.push(
+        `<img src="https://tile.openstreetmap.org/${zoom}/${wrappedX}/${y}.png" alt="" decoding="async" referrerpolicy="no-referrer" style="left:${left}px;top:${top}px">`,
+      );
+    }
+  }
+  return tiles.join("");
+}
+
+function renderMapArrows(projected, xy) {
+  const stops = [0.28, 0.52, 0.76];
+  return stops.map((fraction) => {
+    const current = pointAtRouteFraction(projected, fraction);
+    const ahead = pointAtRouteFraction(projected, Math.min(0.99, fraction + 0.018));
+    const a = xy(current);
+    const b = xy(ahead);
+    const angle = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+    return `
+      <g transform="translate(${a.x.toFixed(1)} ${a.y.toFixed(1)}) rotate(${angle.toFixed(1)})" opacity="0.72">
+        <path d="M7 0 L-5 -5 L-2 0 L-5 5 Z" fill="#1d2522"></path>
+      </g>
+    `;
+  }).join("");
+}
+
+function renderEndpointSvg(point, label, color, dx, dy) {
+  return `
+    <circle cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="7" fill="#fffdf8"></circle>
+    <circle cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="5.2" fill="${color}"></circle>
+    <text x="${(point.x + dx).toFixed(1)}" y="${(point.y + dy).toFixed(1)}" fill="#1d2522" font-size="12" font-weight="800" paint-order="stroke" stroke="#fffdf8" stroke-width="3">${label}</text>
+  `;
+}
+
+function pointAtRouteFraction(projected, fraction) {
+  const lengths = [0];
+  for (let i = 1; i < projected.length; i += 1) {
+    const prev = projected[i - 1];
+    const current = projected[i];
+    const d = Math.hypot(current.x - prev.x, current.y - prev.y);
+    lengths[i] = lengths[i - 1] + d;
+  }
+  const target = lengths[lengths.length - 1] * Math.max(0, Math.min(1, fraction));
+  for (let i = 1; i < lengths.length; i += 1) {
+    if (lengths[i] >= target) {
+      const a = projected[i - 1];
+      const b = projected[i];
+      const t = (target - lengths[i - 1]) / (lengths[i] - lengths[i - 1] || 1);
+      return {
+        x: a.x + (b.x - a.x) * t,
+        y: a.y + (b.y - a.y) * t,
+      };
+    }
+  }
+  return projected[projected.length - 1];
+}
+
+function drawLine(ctx, points, getX, getY, color, lineWidth) {
+  ctx.beginPath();
+  points.forEach((point, index) => {
+    const xx = getX(point);
+    const yy = getY(point);
+    if (index === 0) ctx.moveTo(xx, yy);
+    else ctx.lineTo(xx, yy);
+  });
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lineWidth;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.stroke();
+}
+
+function renderSources() {
+  const sourceById = Object.fromEntries(SOURCES.map((source) => [source.id, source]));
+  document.getElementById("ledgerRows").innerHTML = LEDGER.map(
+    ([element, value, refs]) => `
+      <tr>
+        <td>${element}</td>
+        <td>${value}</td>
+        <td>${refs.map((ref) => `<span class="source-chip">${ref}</span>`).join("")}</td>
+      </tr>
+    `,
+  ).join("");
+
+  document.getElementById("sourceList").innerHTML = SOURCES.map(
+    (source) => `
+      <article class="source-card" id="source-${source.id}">
+        <strong>${source.id} - ${source.title}</strong>
+        <a href="${source.url}" target="_blank" rel="noreferrer">${source.url}</a>
+        <p>${source.note}</p>
+      </article>
+    `,
+  ).join("");
+
+  document.querySelectorAll(".source-chip").forEach((chip) => {
+    const source = sourceById[chip.textContent.trim()];
+    if (source) chip.title = source.title;
+  });
+}
+
+function fmt(value, digits = 0, suffix = "") {
+  return `${Number(value).toLocaleString("fr-FR", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  })}${suffix}`;
+}
