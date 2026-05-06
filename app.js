@@ -3,7 +3,13 @@ const SOURCES = [
     id: "OSM",
     title: "OpenStreetMap / Overpass API",
     url: "https://overpass-api.de/",
-    note: "Géométrie de route assemblée depuis les voies OSM ref D 39, D 43 et D 13.",
+    note: "Géométrie de route et tags maxspeed assemblés depuis les voies OSM ref D 39, D 43 et D 13.",
+  },
+  {
+    id: "LEGIFRANCE",
+    title: "Code de la route, article R413-3",
+    url: "https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000028436430",
+    note: "En agglomération, la vitesse des véhicules est limitée à 50 km/h, sauf signalisation différente.",
   },
   {
     id: "OSMTILES",
@@ -216,6 +222,29 @@ const ROUTE = {
     { km: 8.2, angleDeg: 134, radiusM: 81 },
     { km: 8.99, angleDeg: 65, radiusM: 217 },
   ],
+  speedLimitsUphill: [
+    {
+      startKm: 0,
+      endKm: 0.2,
+      kmh: 50,
+      label: "Avenue de Marlioz",
+      note: "maxspeed=50 dans OSM",
+    },
+    {
+      startKm: 0.2,
+      endKm: 0.78,
+      kmh: 30,
+      label: "Avenue de Marlioz / Pont de l'Ugine",
+      note: "maxspeed=30 dans OSM",
+    },
+    {
+      startKm: 0.78,
+      endKm: 10.2351,
+      kmh: 50,
+      label: "Tronçons non tagués, hypothèse agglomération",
+      note: "50 km/h par défaut en agglomération quand OSM ne tague pas maxspeed",
+    },
+  ],
   mapPointsUphill: [
     [45.919231, 6.70447],
     [45.919318, 6.706562],
@@ -350,6 +379,7 @@ const CONSTANTS = {
   roadPM25: 0.27,
   pmMinKmh: 25,
   pmReferenceKmh: 45,
+  urbanSpeedKmh: 50,
 };
 
 const VEHICLES = {
@@ -391,6 +421,8 @@ const LEDGER = [
   ["Fond de carte", "Tuiles https://tile.openstreetmap.org/{z}/{x}/{y}.png", ["OSMTILES"]],
   ["Altitudes", "45 points EU-DEM 25 m, 578,1 à 1038,7 m", ["OTD"]],
   ["Virages", "Rayons déduits de la géométrie OSM; v = sqrt(a_lateral x R)", ["OSM", "CURVE"]],
+  ["Limites de vitesse", "maxspeed OSM quand tagué; sinon hypothèse 50 km/h en agglomération", ["OSM", "LEGIFRANCE"]],
+  ["Profil de vitesse", "v = min(v_curseur, v_limite, v_virage), avec approche freinage/accélération", ["OSM", "LEGIFRANCE", "CURVE", "COMFORT"]],
   ["Bilan des forces", "F = m a + Crr m g cos(theta) + 0,5 rho Cd A v2 + m g sin(theta)", ["DYN"]],
   ["Cinématique freinage", "v2 = v0 2 + 2 a s", ["DYN", "COMFORT"]],
   ["Véhicule Nissan Note", "m=1118 kg; Cd=0,30; A=2,25 m2; Crr=0,009; eta=22 %", ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15"]],
@@ -548,6 +580,8 @@ function getDirectionalRoute(direction) {
   const downhillCurves = ROUTE.curvesUphill
     .map((curve) => ({ ...curve, km: totalKm - curve.km }))
     .sort((a, b) => a.km - b.km);
+  const uphillSpeedLimits = ROUTE.speedLimitsUphill.map((limit) => ({ ...limit }));
+  const downhillSpeedLimits = reverseSpeedLimits(ROUTE.speedLimitsUphill, totalKm);
   const uphillMapPoints = ROUTE.mapPointsUphill.map(([lat, lon]) => ({ lat, lon }));
 
   if (direction === "up") {
@@ -557,6 +591,7 @@ function getDirectionalRoute(direction) {
       distanceM: ROUTE.distanceM,
       points: uphillPoints,
       curves: uphillCurves,
+      speedLimits: uphillSpeedLimits,
       mapPoints: uphillMapPoints,
     };
   }
@@ -574,6 +609,14 @@ function getDirectionalRoute(direction) {
         ...uphillCurves,
         ...downhillCurves.map((curve) => ({ ...curve, km: totalKm + curve.km })),
       ].sort((a, b) => a.km - b.km),
+      speedLimits: [
+        ...uphillSpeedLimits,
+        ...downhillSpeedLimits.map((limit) => ({
+          ...limit,
+          startKm: totalKm + limit.startKm,
+          endKm: totalKm + limit.endKm,
+        })),
+      ],
       mapPoints: [
         ...uphillMapPoints,
         ...uphillMapPoints.slice(0, -1).reverse(),
@@ -588,37 +631,76 @@ function getDirectionalRoute(direction) {
     distanceM: ROUTE.distanceM,
     points: downhillPoints,
     curves: downhillCurves,
+    speedLimits: downhillSpeedLimits,
     mapPoints: uphillMapPoints.reverse(),
   };
 }
 
-function simulate(targetKmh, params, route) {
-  const n = 260;
-  const distanceM = route.distanceM;
-  const target = kmhToMps(targetKmh);
+function reverseSpeedLimits(limits, totalKm) {
+  return limits
+    .map((limit) => ({
+      ...limit,
+      startKm: totalKm - limit.endKm,
+      endKm: totalKm - limit.startKm,
+    }))
+    .sort((a, b) => a.startKm - b.startKm);
+}
+
+function buildSpeedProfile(targetKmh, params, route, n) {
+  const targetMps = kmhToMps(targetKmh);
   const minSpeed = kmhToMps(5);
   const points = [];
 
   for (let i = 0; i <= n; i += 1) {
-    const m = (distanceM * i) / n;
+    const m = (route.distanceM * i) / n;
     const km = m / 1000;
-    let v = target;
+    const speedLimitMps = kmhToMps(speedLimitAt(route, km));
+    let speedMps = Math.min(targetMps, speedLimitMps);
 
     route.curves.forEach((curve) => {
       const curveM = curve.km * 1000;
-      const cap = Math.min(target, Math.sqrt(params.latAccel * curve.radiusM));
+      const curveSpeedLimitMps = kmhToMps(speedLimitAt(route, curve.km));
+      const curveCap = Math.min(targetMps, curveSpeedLimitMps, Math.sqrt(params.latAccel * curve.radiusM));
       const gap = Math.abs(curveM - m);
-      const limit = Math.sqrt(cap * cap + 2 * params.longAccel * gap);
-      v = Math.min(v, limit);
+      const approachLimit = Math.sqrt(curveCap * curveCap + 2 * params.longAccel * gap);
+      speedMps = Math.min(speedMps, approachLimit);
     });
 
     points.push({
       km,
       m,
       elev: interpolateElevation(route.points, km),
-      speedMps: Math.max(minSpeed, v),
+      speedMps: Math.max(minSpeed, speedMps),
+      limitKmh: speedLimitAt(route, km),
     });
   }
+
+  for (let i = 1; i < points.length; i += 1) {
+    const ds = points[i].m - points[i - 1].m;
+    const accelLimit = Math.sqrt(points[i - 1].speedMps * points[i - 1].speedMps + 2 * params.longAccel * ds);
+    points[i].speedMps = Math.min(points[i].speedMps, accelLimit);
+  }
+
+  for (let i = points.length - 2; i >= 0; i -= 1) {
+    const ds = points[i + 1].m - points[i].m;
+    const brakeLimit = Math.sqrt(points[i + 1].speedMps * points[i + 1].speedMps + 2 * params.longAccel * ds);
+    points[i].speedMps = Math.min(points[i].speedMps, brakeLimit);
+  }
+
+  return points;
+}
+
+function speedLimitAt(route, km) {
+  const segment = route.speedLimits?.find((limit) => (
+    km >= limit.startKm - 1e-6 && km <= limit.endKm + 1e-6
+  ));
+  return segment ? segment.kmh : CONSTANTS.urbanSpeedKmh;
+}
+
+function simulate(targetKmh, params, route) {
+  const n = 260;
+  const distanceM = route.distanceM;
+  const points = buildSpeedProfile(targetKmh, params, route, n);
 
   let tractionJ = 0;
   let brakeJ = 0;
@@ -727,31 +809,7 @@ function estimateBrakeDemandMultiplier(targetKmh, params, route, currentDemandJ)
 
 function estimateBrakeDemandOnly(targetKmh, params, route) {
   const n = 260;
-  const distanceM = route.distanceM;
-  const target = kmhToMps(targetKmh);
-  const minSpeed = kmhToMps(5);
-  const points = [];
-
-  for (let i = 0; i <= n; i += 1) {
-    const m = (distanceM * i) / n;
-    const km = m / 1000;
-    let v = target;
-
-    route.curves.forEach((curve) => {
-      const curveM = curve.km * 1000;
-      const cap = Math.min(target, Math.sqrt(params.latAccel * curve.radiusM));
-      const gap = Math.abs(curveM - m);
-      const limit = Math.sqrt(cap * cap + 2 * params.longAccel * gap);
-      v = Math.min(v, limit);
-    });
-
-    points.push({
-      km,
-      m,
-      elev: interpolateElevation(route.points, km),
-      speedMps: Math.max(minSpeed, v),
-    });
-  }
+  const points = buildSpeedProfile(targetKmh, params, route, n);
 
   let brakeJ = 0;
   let decelJ = 0;
@@ -811,6 +869,7 @@ function renderRouteFacts(route) {
     ["Trajet", route.label],
     ["Distance", fmt(route.distanceM / 1000, 2, " km")],
     ["Dénivelé", elevationFact],
+    ["Limites", summarizeSpeedLimits(route)],
     ["Virages", `${route.curves.length} détectés`],
   ]
     .map(([label, value]) => `<div class="fact"><strong>${value}</strong><span>${label}</span></div>`)
@@ -834,16 +893,22 @@ function summarizeElevation(points) {
   };
 }
 
+function summarizeSpeedLimits(route) {
+  const values = [...new Set(route.speedLimits.map((limit) => limit.kmh))].sort((a, b) => a - b);
+  return values.length === 1 ? fmt(values[0], 0, " km/h") : `${values.map((value) => fmt(value, 0)).join("-")} km/h`;
+}
+
 function renderMetrics(a, b) {
   const vehicleRefs = getVehicleCalculationSources();
+  const speedRefs = ["OSM", "LEGIFRANCE"];
   const rows = [
-    ["Carburant", "fuelL", " L", 2, true, ["DYN", "OTD", "CURVE", "COMFORT", "NAP15", "DOE", ...vehicleRefs], "Bilan longitudinal, rendement moteur et PCI essence."],
-    ["Consommation", "fuelLPer100", " L/100 km", 1, true, ["DYN", "OSM", "OTD", "NAP15", "DOE", ...vehicleRefs], "Carburant simulé rapporté à la distance routière."],
-    ["CO2 échappement", "co2Kg", " kg", 2, true, ["DYN", "DOE", "EPA", "NAP15", ...vehicleRefs], "Litres d'essence multipliés par le facteur CO2 essence."],
-    ["PM10 hors échappement", "pm10Mg", " mg", 0, true, ["EMEP", "BEDDOWS", "BRAKE", "OSM", ...vehicleRefs], "Facteurs pneus, freins et chaussée modulés par masse et freinage."],
-    ["PM2,5 hors échappement", "pm25Mg", " mg", 0, true, ["EMEP", "BEDDOWS", "BRAKE", "OSM", ...vehicleRefs], "Fractions PM2,5 appliquées aux émissions hors échappement."],
-    ["Temps", "timeMin", " min", 1, true, ["OSM", "CURVE", "COMFORT"], "Distance segmentée divisée par le profil de vitesse local.", "absolute"],
-    ["Vitesse moyenne", "avgKmh", " km/h", 1, false, ["OSM", "CURVE", "COMFORT"], "Distance routière divisée par le temps simulé."],
+    ["Carburant", "fuelL", " L", 2, true, ["DYN", "OTD", "CURVE", "COMFORT", "NAP15", "DOE", ...speedRefs, ...vehicleRefs], "Bilan longitudinal, rendement moteur et PCI essence."],
+    ["Consommation", "fuelLPer100", " L/100 km", 1, true, ["DYN", "OSM", "OTD", "NAP15", "DOE", "LEGIFRANCE", ...vehicleRefs], "Carburant simulé rapporté à la distance routière."],
+    ["CO2 échappement", "co2Kg", " kg", 2, true, ["DYN", "DOE", "EPA", "NAP15", ...speedRefs, ...vehicleRefs], "Litres d'essence multipliés par le facteur CO2 essence."],
+    ["PM10 hors échappement", "pm10Mg", " mg", 0, true, ["EMEP", "BEDDOWS", "BRAKE", ...speedRefs, ...vehicleRefs], "Facteurs pneus, freins et chaussée modulés par masse, limites de vitesse et freinage."],
+    ["PM2,5 hors échappement", "pm25Mg", " mg", 0, true, ["EMEP", "BEDDOWS", "BRAKE", ...speedRefs, ...vehicleRefs], "Fractions PM2,5 appliquées aux émissions hors échappement."],
+    ["Temps", "timeMin", " min", 1, true, ["OSM", "LEGIFRANCE", "CURVE", "COMFORT"], "Distance segmentée divisée par le profil de vitesse plafonné par les limites locales.", "absolute"],
+    ["Vitesse moyenne", "avgKmh", " km/h", 1, false, ["OSM", "LEGIFRANCE", "CURVE", "COMFORT"], "Distance routière divisée par le temps simulé."],
   ];
 
   document.getElementById("metrics").innerHTML = rows
@@ -1030,6 +1095,10 @@ function drawProfile(route, a, b) {
   ctx.fill();
 
   drawLine(ctx, route.points, (p) => x(p.km), (p) => yElev(p.elev), "#51635b", 2);
+  ctx.save();
+  ctx.setLineDash([6, 5]);
+  drawLine(ctx, speedLimitLinePoints(route), (p) => x(p.km), (p) => ySpeed(kmhToMps(p.kmh)), "#81786c", 2);
+  ctx.restore();
   drawLine(ctx, a.points, (p) => x(p.km), (p) => ySpeed(p.speedMps), "#2f7d63", 3);
   drawLine(ctx, b.points, (p) => x(p.km), (p) => ySpeed(p.speedMps), "#246f9e", 3);
 
@@ -1053,6 +1122,14 @@ function drawProfile(route, a, b) {
   ctx.fillStyle = "#59635e";
   ctx.fillText("distance", pad.left + innerW / 2 - 22, height - 14);
   ctx.fillText("km/h", width - 36, pad.top - 8);
+}
+
+function speedLimitLinePoints(route) {
+  const totalKm = route.distanceM / 1000;
+  return route.speedLimits.flatMap((limit) => [
+    { km: Math.max(0, Math.min(totalKm, limit.startKm)), kmh: limit.kmh },
+    { km: Math.max(0, Math.min(totalKm, limit.endKm)), kmh: limit.kmh },
+  ]);
 }
 
 function drawMap(route) {
