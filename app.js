@@ -457,7 +457,8 @@ const LEDGER = [
   ["Altitudes", "45 points EU-DEM 25 m, 578,1 à 1038,7 m", ["OTD"]],
   ["Virages", "Rayons déduits de la géométrie OSM; v = sqrt(a_lateral x R)", ["OSM", "CURVE"]],
   ["Limites de vitesse", "maxspeed OSM quand tagué; 50 km/h en ville; hypothèse 90 km/h hors ville", ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132"]],
-  ["Profil de vitesse", "v = min(v_curseur, v_limite, v_virage), avec approche freinage/accélération", ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132", "CURVE", "COMFORT"]],
+  ["Profil de vitesse montée", "v = min(v_curseur, v_limite, v_virage), avec approche freinage/accélération", ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132", "CURVE", "COMFORT"]],
+  ["Descente en roue libre", "au-delà de v_curseur, pas de freinage tant que v < min(v_limite, v_virage)", ["DYN", "LEGIFRANCE", "LEGIFRANCE_R4132", "CURVE", "COMFORT"]],
   ["Bilan des forces", "F = m a + Crr m g cos(theta) + 0,5 rho Cd A v2 + m g sin(theta)", ["DYN"]],
   ["Cinématique freinage", "v2 = v0 2 + 2 a s", ["DYN", "COMFORT"]],
   ["Véhicule Nissan Note", "m=1118 kg; Cd=0,30; A=2,25 m2; Crr=0,009; eta=22 %", ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15"]],
@@ -684,18 +685,23 @@ function reverseSpeedLimits(limits, totalKm) {
 function buildSpeedProfile(targetKmh, params, route, n) {
   const targetMps = kmhToMps(targetKmh);
   const minSpeed = kmhToMps(5);
+  const cruiseIsHardCap = route.direction === "up";
   const points = [];
 
   for (let i = 0; i <= n; i += 1) {
     const m = (route.distanceM * i) / n;
     const km = m / 1000;
     const speedLimitMps = kmhToMps(speedLimitAt(route, km));
-    let speedMps = Math.min(targetMps, speedLimitMps);
+    let speedMps = cruiseIsHardCap ? Math.min(targetMps, speedLimitMps) : speedLimitMps;
 
     route.curves.forEach((curve) => {
       const curveM = curve.km * 1000;
       const curveSpeedLimitMps = kmhToMps(speedLimitAt(route, curve.km));
-      const curveCap = Math.min(targetMps, curveSpeedLimitMps, Math.sqrt(params.latAccel * curve.radiusM));
+      const curveCap = Math.min(
+        cruiseIsHardCap ? targetMps : Number.POSITIVE_INFINITY,
+        curveSpeedLimitMps,
+        Math.sqrt(params.latAccel * curve.radiusM),
+      );
       const gap = Math.abs(curveM - m);
       const approachLimit = Math.sqrt(curveCap * curveCap + 2 * params.longAccel * gap);
       speedMps = Math.min(speedMps, approachLimit);
@@ -722,7 +728,46 @@ function buildSpeedProfile(targetKmh, params, route, n) {
     points[i].speedMps = Math.min(points[i].speedMps, brakeLimit);
   }
 
+  if (!cruiseIsHardCap) {
+    return applyCoastingDescentProfile(points, targetMps, params);
+  }
+
   return points;
+}
+
+function applyCoastingDescentProfile(capPoints, targetMps, params) {
+  const minSpeed = kmhToMps(5);
+  const points = capPoints.map((point) => ({ ...point }));
+  points[0].speedMps = Math.min(points[0].speedMps, Math.max(minSpeed, targetMps));
+
+  for (let i = 1; i < points.length; i += 1) {
+    const previous = points[i - 1];
+    const point = points[i];
+    const ds = point.m - previous.m;
+    const freeAccel = coastingAcceleration(previous.speedMps, previous, point, params);
+    const freeSpeed = Math.sqrt(Math.max(minSpeed * minSpeed, previous.speedMps * previous.speedMps + 2 * freeAccel * ds));
+    let nextSpeed = freeSpeed;
+
+    if (freeSpeed < targetMps) {
+      const poweredSpeed = Math.sqrt(previous.speedMps * previous.speedMps + 2 * params.longAccel * ds);
+      nextSpeed = Math.max(freeSpeed, Math.min(targetMps, poweredSpeed));
+    }
+
+    point.speedMps = Math.min(point.speedMps, Math.max(minSpeed, nextSpeed));
+  }
+
+  return points;
+}
+
+function coastingAcceleration(speedMps, a, b, params) {
+  const ds = Math.max(b.m - a.m, 0.1);
+  const dh = b.elev - a.elev;
+  const theta = Math.atan2(dh, ds);
+  const speed = Math.max(speedMps, kmhToMps(3));
+  const fRoll = params.crr * params.mass * CONSTANTS.g * Math.cos(theta);
+  const fAero = 0.5 * CONSTANTS.rho * params.cd * params.area * speed * speed;
+  const fGrade = params.mass * CONSTANTS.g * Math.sin(theta);
+  return -(fRoll + fAero + fGrade) / params.mass;
 }
 
 function speedLimitAt(route, km) {

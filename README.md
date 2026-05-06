@@ -14,6 +14,8 @@ Le modèle est volontairement transparent:
   BMW X5 4.8is 2004, Dodge Ram 1500 SLT/TRX4 2007;
 - le profil de vitesse est plafonné par les limites OSM taguées, par 50 km/h en ville,
   et par une hypothèse 90 km/h hors ville quand aucun `maxspeed` n'est tagué;
+- en descente, la vitesse A/B n'impose pas un freinage permanent: le véhicule roule en
+  roue libre au-dessus de la consigne et freine seulement pour une limite ou un virage;
 - le carburant est dérivé de l'énergie positive aux roues, du rendement moteur et du PCI de
   l'essence;
 - les particules pneus, freins et chaussée utilisent les facteurs EMEP/EEA;
