@@ -358,6 +358,50 @@ h3 {
   accent-color: var(--blue);
 }
 
+.advanced-controls {
+  display: grid;
+  gap: 12px;
+}
+
+.advanced-controls summary {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #f7f2e8;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.advanced-controls summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-controls summary::before {
+  content: "+";
+  margin-right: 7px;
+  color: var(--green);
+  font-weight: 900;
+}
+
+.advanced-controls[open] summary::before {
+  content: "-";
+}
+
+.advanced-controls[open] summary {
+  color: var(--green);
+}
+
+.advanced-control-grid {
+  display: grid;
+  gap: 15px;
+}
+
 .visual-panel {
   min-width: 0;
 }

@@ -81,17 +81,22 @@
             <input id="speedB" type="range" min="25" max="90" step="1" value="50" />
           </label>
 
-          <label class="control">
-            <span>Confort latéral</span>
-            <output id="latOut">1,47 m/s2</output>
-            <input id="latAccel" type="range" min="0.8" max="3.0" step="0.01" value="1.47" />
-          </label>
+          <details class="advanced-controls">
+            <summary>Avancé</summary>
+            <div class="advanced-control-grid">
+              <label class="control">
+                <span>Confort latéral</span>
+                <output id="latOut">1,47 m/s2</output>
+                <input id="latAccel" type="range" min="0.8" max="3.0" step="0.01" value="1.47" />
+              </label>
 
-          <label class="control">
-            <span>Accél. / freinage</span>
-            <output id="longOut">1,50 m/s2</output>
-            <input id="longAccel" type="range" min="0.7" max="3.0" step="0.05" value="1.5" />
-          </label>
+              <label class="control">
+                <span>Accél. / freinage</span>
+                <output id="longOut">1,50 m/s2</output>
+                <input id="longAccel" type="range" min="0.7" max="3.0" step="0.05" value="1.5" />
+              </label>
+            </div>
+          </details>
         </div>
       </section>
 
