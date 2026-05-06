@@ -252,6 +252,20 @@ const ROUTE = {
     },
     {
       startKm: 1.25,
+      endKm: 3.45,
+      kmh: 90,
+      label: "Hors ville",
+      note: "Hypothèse 90 km/h sur les tronçons hors agglomération sans maxspeed OSM",
+    },
+    {
+      startKm: 3.45,
+      endKm: 4.35,
+      kmh: 50,
+      label: "Chef-lieu de Passy",
+      note: "50 km/h en agglomération autour de la Place de la Mairie / D13",
+    },
+    {
+      startKm: 4.35,
       endKm: 9.05,
       kmh: 90,
       label: "Hors ville",
