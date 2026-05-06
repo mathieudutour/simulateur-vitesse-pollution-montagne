@@ -842,7 +842,6 @@ function renderMetrics(a, b) {
     ["CO2 echappement", "co2Kg", " kg", 2, true, ["DYN", "DOE", "EPA", "NAP15", ...vehicleRefs], "Litres d'essence multiplies par le facteur CO2 essence."],
     ["PM10 hors echappement", "pm10Mg", " mg", 0, true, ["EMEP", "BEDDOWS", "BRAKE", "OSM", ...vehicleRefs], "Facteurs pneus, freins et chaussee modules par masse et freinage."],
     ["PM2,5 hors echappement", "pm25Mg", " mg", 0, true, ["EMEP", "BEDDOWS", "BRAKE", "OSM", ...vehicleRefs], "Fractions PM2,5 appliquees aux emissions hors echappement."],
-    ["Energie freinee", "brakeKWh", " kWh", 2, true, ["DYN", "OTD", "CURVE", "COMFORT", "BRAKE", ...vehicleRefs], "Energie dissipee quand le bilan aux roues devient negatif."],
     ["Temps", "timeMin", " min", 1, false, ["OSM", "CURVE", "COMFORT"], "Distance segmentee divisee par le profil de vitesse local."],
     ["Vitesse moyenne", "avgKmh", " km/h", 1, false, ["OSM", "CURVE", "COMFORT"], "Distance routiere divisee par le temps simule."],
   ];
@@ -900,6 +899,7 @@ function renderBreakdown(a, b) {
   const energyA = a.aeroKWh + a.rollKWh + a.climbKWh + a.inertiaKWh;
   const energyB = b.aeroKWh + b.rollKWh + b.climbKWh + b.inertiaKWh;
   const maxEnergy = Math.max(energyA, energyB, 0.01);
+  const maxBrake = Math.max(a.brakeKWh, b.brakeKWh, 0.01);
   const pmRows = [
     ["Pneus", a.tyrePm10Mg, b.tyrePm10Mg],
     ["Freins", a.brakePm10Mg, b.brakePm10Mg],
@@ -907,17 +907,6 @@ function renderBreakdown(a, b) {
   ];
   const maxPm = Math.max(...pmRows.flatMap(([, valueA, valueB]) => [valueA, valueB]), 1);
   document.getElementById("breakdown").innerHTML = `
-    <section class="breakdown-section">
-      <div class="breakdown-title">
-        <span>Energie positive aux roues</span>
-        <small>kWh</small>
-      </div>
-      <div class="vertical-chart energy-chart">
-        ${verticalBar(`A ${fmt(a.targetKmh, 0, " km/h")}`, energyA, maxEnergy, " kWh", 2, "a")}
-        ${verticalBar(`B ${fmt(b.targetKmh, 0, " km/h")}`, energyB, maxEnergy, " kWh", 2, "b")}
-      </div>
-    </section>
-
     <section class="breakdown-section">
       <div class="breakdown-title">
         <span>PM10 hors echappement</span>
@@ -933,6 +922,30 @@ function renderBreakdown(a, b) {
         `).join("")}
       </div>
     </section>
+
+    <details class="advanced-breakdown">
+      <summary>Avance</summary>
+      <section class="breakdown-section">
+        <div class="breakdown-title">
+          <span>Energie positive aux roues</span>
+          <small>kWh</small>
+        </div>
+        <div class="vertical-chart energy-chart">
+          ${verticalBar(`A ${fmt(a.targetKmh, 0, " km/h")}`, energyA, maxEnergy, " kWh", 2, "a")}
+          ${verticalBar(`B ${fmt(b.targetKmh, 0, " km/h")}`, energyB, maxEnergy, " kWh", 2, "b")}
+        </div>
+      </section>
+      <section class="breakdown-section">
+        <div class="breakdown-title">
+          <span>Energie freinee</span>
+          <small>kWh</small>
+        </div>
+        <div class="vertical-chart energy-chart">
+          ${verticalBar(`A ${fmt(a.targetKmh, 0, " km/h")}`, a.brakeKWh, maxBrake, " kWh", 2, "a")}
+          ${verticalBar(`B ${fmt(b.targetKmh, 0, " km/h")}`, b.brakeKWh, maxBrake, " kWh", 2, "b")}
+        </div>
+      </section>
+    </details>
   `;
 }
 

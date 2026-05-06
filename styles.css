@@ -639,6 +639,51 @@ canvas {
   gap: 10px;
 }
 
+.advanced-breakdown {
+  display: grid;
+  gap: 12px;
+  padding-top: 2px;
+}
+
+.advanced-breakdown summary {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #f7f2e8;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.advanced-breakdown summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-breakdown summary::before {
+  content: "+";
+  margin-right: 7px;
+  color: var(--green);
+  font-weight: 900;
+}
+
+.advanced-breakdown[open] summary::before {
+  content: "-";
+}
+
+.advanced-breakdown[open] summary {
+  margin-bottom: 12px;
+  color: var(--green);
+}
+
+.advanced-breakdown .breakdown-section + .breakdown-section {
+  margin-top: 16px;
+}
+
 .breakdown-title {
   display: flex;
   justify-content: space-between;
