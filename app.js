@@ -1199,6 +1199,7 @@ function drawMap(route) {
     const pos = xy(point);
     return `${pos.x.toFixed(1)},${pos.y.toFixed(1)}`;
   }).join(" ");
+  const speedPaths = renderSpeedLimitMapSegments(route, projected, xy);
   const arrows = renderMapArrows(projected, xy);
   const curves = route.curves.map((curve) => {
     const point = pointAtRouteFraction(projected, curve.km / (route.distanceM / 1000));
@@ -1227,7 +1228,7 @@ function drawMap(route) {
     <svg viewBox="0 0 ${width} ${height}" aria-hidden="true">
       <polyline points="${path}" fill="none" stroke="rgba(29,37,34,0.32)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"></polyline>
       <polyline points="${path}" fill="none" stroke="#fffdf8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></polyline>
-      <polyline points="${path}" fill="none" stroke="#2f7d63" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></polyline>
+      ${speedPaths}
       ${arrows}
       ${curves}
       ${endpoints}
@@ -1236,6 +1237,37 @@ function drawMap(route) {
     </svg>
     <div class="map-attribution">
       <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors</a>
+    </div>
+    ${renderSpeedLimitMapLegend(route)}
+  `;
+}
+
+function renderSpeedLimitMapSegments(route, projected, xy) {
+  const totalKm = route.distanceM / 1000;
+  return route.speedLimits.map((limit) => {
+    const segmentPoints = projectedRouteSegmentPoints(
+      projected,
+      Math.max(0, limit.startKm / totalKm),
+      Math.min(1, limit.endKm / totalKm),
+    );
+    const points = segmentPoints.map((point) => {
+      const pos = xy(point);
+      return `${pos.x.toFixed(1)},${pos.y.toFixed(1)}`;
+    }).join(" ");
+
+    return `
+      <polyline points="${points}" fill="none" stroke="${speedLimitColor(limit.kmh)}" stroke-width="4.8" stroke-linecap="round" stroke-linejoin="round"></polyline>
+    `;
+  }).join("");
+}
+
+function renderSpeedLimitMapLegend(route) {
+  const limits = [...new Set(route.speedLimits.map((limit) => limit.kmh))].sort((a, b) => a - b);
+  return `
+    <div class="map-speed-legend" aria-hidden="true">
+      ${limits.map((kmh) => `
+        <span><i style="background:${speedLimitColor(kmh)}"></i>${fmt(kmh, 0, " km/h")}</span>
+      `).join("")}
     </div>
   `;
 }
@@ -1303,6 +1335,22 @@ function renderMapArrows(projected, xy) {
   }).join("");
 }
 
+function projectedRouteSegmentPoints(projected, startFraction, endFraction) {
+  const measures = projectedRouteMeasures(projected);
+  const totalLength = measures[measures.length - 1];
+  const startLength = totalLength * Math.max(0, Math.min(1, startFraction));
+  const endLength = totalLength * Math.max(0, Math.min(1, endFraction));
+  const segment = [
+    pointAtRouteLength(projected, measures, startLength),
+    ...projected.filter((_, index) => measures[index] > startLength && measures[index] < endLength),
+    pointAtRouteLength(projected, measures, endLength),
+  ];
+
+  return segment.filter((point, index) => (
+    index === 0 || Math.hypot(point.x - segment[index - 1].x, point.y - segment[index - 1].y) > 0.1
+  ));
+}
+
 function renderEndpointSvg(point, label, color, dx, dy) {
   return `
     <circle cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="7" fill="#fffdf8"></circle>
@@ -1312,6 +1360,15 @@ function renderEndpointSvg(point, label, color, dx, dy) {
 }
 
 function pointAtRouteFraction(projected, fraction) {
+  const lengths = projectedRouteMeasures(projected);
+  return pointAtRouteLength(
+    projected,
+    lengths,
+    lengths[lengths.length - 1] * Math.max(0, Math.min(1, fraction)),
+  );
+}
+
+function projectedRouteMeasures(projected) {
   const lengths = [0];
   for (let i = 1; i < projected.length; i += 1) {
     const prev = projected[i - 1];
@@ -1319,7 +1376,10 @@ function pointAtRouteFraction(projected, fraction) {
     const d = Math.hypot(current.x - prev.x, current.y - prev.y);
     lengths[i] = lengths[i - 1] + d;
   }
-  const target = lengths[lengths.length - 1] * Math.max(0, Math.min(1, fraction));
+  return lengths;
+}
+
+function pointAtRouteLength(projected, lengths, target) {
   for (let i = 1; i < lengths.length; i += 1) {
     if (lengths[i] >= target) {
       const a = projected[i - 1];
@@ -1332,6 +1392,12 @@ function pointAtRouteFraction(projected, fraction) {
     }
   }
   return projected[projected.length - 1];
+}
+
+function speedLimitColor(kmh) {
+  if (kmh <= 30) return "#b5483f";
+  if (kmh <= 50) return "#b46b20";
+  return "#2f7d63";
 }
 
 function drawLine(ctx, points, getX, getY, color, lineWidth) {

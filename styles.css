@@ -435,6 +435,36 @@ canvas {
   color: var(--blue);
 }
 
+.map-speed-legend {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: calc(100% - 16px);
+  padding: 5px;
+  border: 1px solid rgba(44, 38, 28, 0.14);
+  border-radius: 6px;
+  background: rgba(255, 253, 248, 0.92);
+  color: #43504a;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.map-speed-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.map-speed-legend i {
+  width: 14px;
+  height: 5px;
+  border-radius: 99px;
+}
+
 .map-loading {
   position: absolute;
   inset: 0;
