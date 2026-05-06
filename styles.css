@@ -505,7 +505,7 @@ canvas {
 
 .metric-stack {
   display: grid;
-  gap: 10px;
+  gap: 14px;
 }
 
 .metric {
@@ -551,7 +551,7 @@ canvas {
 .metric-tooltip {
   position: absolute;
   right: 10px;
-  bottom: calc(100% + 8px);
+  top: calc(100% + 8px);
   left: 10px;
   z-index: 30;
   display: grid;
@@ -563,7 +563,7 @@ canvas {
   box-shadow: 0 14px 36px rgba(44, 38, 28, 0.18);
   opacity: 0;
   pointer-events: none;
-  transform: translateY(4px);
+  transform: translateY(-4px);
   transition:
     opacity 140ms ease,
     transform 140ms ease,
