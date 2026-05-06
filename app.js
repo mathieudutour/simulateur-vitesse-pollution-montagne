@@ -391,8 +391,8 @@ const ROUTE = {
 const DEFAULTS = {
   direction: "up",
   vehicleId: "note",
-  speedA: 70,
-  speedB: 45,
+  speedA: 90,
+  speedB: 50,
   latAccel: 1.47,
   longAccel: 1.5,
 };
