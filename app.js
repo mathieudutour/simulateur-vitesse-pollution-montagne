@@ -39,7 +39,7 @@ const SOURCES = [
     id: "FUELPRICE",
     title: "Prix-carburants.gouv.fr, flux instantané",
     url: "https://www.prix-carburants.gouv.fr/rubrique/opendata/",
-    note: "Station 74190003, Super U Passy: SP95-E10/E10 = 1,989 €/L, relevé déclaré le 25/03/2026 09:38:14.",
+    note: "Flux instantané consulté le 06/05/2026; la station 74190003, Super U Passy, y déclare SP95-E10/E10 = 1,989 €/L depuis le 25/03/2026 09:38:14. La page station Super U affiche le même prix.",
   },
   {
     id: "MED",
@@ -474,7 +474,7 @@ const LEDGER = [
   ["Photos véhicules", "Images du sélecteur, licence indiquée sur chaque fiche Commons", ["PHOTO_NOTE", "PHOTO_X5", "PHOTO_RAM"]],
   ["Air et gravité", "rho = 1,225 kg/m3; g = 9,80665 m/s2", ["ISA"]],
   ["Essence", "PCI = 31,82 MJ/L, dérivé de 112114-116090 Btu/gal", ["DOE"]],
-  ["Prix essence Super U", "SP95-E10 = 1,989 €/L, station 74190003, relevé du 25/03/2026 09:38", ["FUELPRICE", "SUPERU"]],
+  ["Prix essence Super U", "SP95-E10 = 1,989 €/L; flux consulté le 06/05/2026, dernier relevé station du 25/03/2026 09:38", ["FUELPRICE", "SUPERU"]],
   ["CO2 essence", "8887 g CO2/gal = 2,35 kg CO2/L", ["EPA"]],
   ["Pneus", "TSP = 0,0107 g/km x m/m_Note; PM10/TSP = 0,60; PM2,5/TSP = 0,42", ["EMEP", "BEDDOWS"]],
   ["Freins", "TSP = 0,0142 g/km x m/m_Note x max(1, max_25..V(Efrein + Ecin_perdue)/(Efrein_45 + Ecin_perdue_45)); PM10/TSP = 0,98; PM2,5/TSP = 0,39", ["EMEP", "BRAKE", "BEDDOWS"]],
