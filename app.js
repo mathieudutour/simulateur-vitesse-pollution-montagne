@@ -3,7 +3,7 @@ const SOURCES = [
     id: "OSM",
     title: "OpenStreetMap / Overpass API",
     url: "https://overpass-api.de/",
-    note: "Geometrie de route assemblee depuis les voies OSM ref D 39, D 43 et D 13.",
+    note: "Géométrie de route assemblée depuis les voies OSM ref D 39, D 43 et D 13.",
   },
   {
     id: "OSMTILES",
@@ -15,37 +15,37 @@ const SOURCES = [
     id: "OTD",
     title: "Open Topo Data, EU-DEM 25 m",
     url: "https://www.opentopodata.org/",
-    note: "Altitudes interrogees sur le jeu europeen eudem25m, source EEA.",
+    note: "Altitudes interrogées sur le jeu européen eudem25m, source EEA.",
   },
   {
     id: "SUPERU",
     title: "Magasins U, Super U Passy",
     url: "https://www.magasins-u.com/magasin/superu-passy",
-    note: "Adresse du point de depart: 91 avenue de Marlioz, 74190 Passy.",
+    note: "Adresse du point de départ: 91 avenue de Marlioz, 74190 Passy.",
   },
   {
     id: "MED",
-    title: "Ville de Passy, Maison medicale du Plateau d'Assy",
+    title: "Ville de Passy, Maison médicale du Plateau d'Assy",
     url: "https://www.ville-passy-mont-blanc.fr/maison-medicale-du-plateau-dassy-passy/",
-    note: "Adresse du point d'arrivee: 50 place Theophile Vallet, 74190 Passy.",
+    note: "Adresse du point d'arrivée: 50 place Théophile Vallet, 74190 Passy.",
   },
   {
     id: "DYN",
     title: "Liu, Feng & Li, Energies 2017",
     url: "https://www.mdpi.com/1996-1073/10/5/700",
-    note: "Modele longitudinal: inertie, roulement, trainee aerodynamique et pente.",
+    note: "Modèle longitudinal: inertie, roulement, traînée aérodynamique et pente.",
   },
   {
     id: "AUTOEVO",
     title: "AutoEvolution, Nissan Note 2013 specifications",
     url: "https://www.autoevolution.com/cars/nissan-note-2013.html",
-    note: "Masse et Cd du Nissan Note 2013 utilises pour le profil citadine.",
+    note: "Masse et Cd du Nissan Note 2013 utilisés pour le profil citadine.",
   },
   {
     id: "CARSPECTOR",
     title: "Carspector, Nissan Note frontal area",
     url: "https://carspector.com/car/nissan/044571/",
-    note: "Surface frontale estimee du Nissan Note.",
+    note: "Surface frontale estimée du Nissan Note.",
   },
   {
     id: "X5_SPEC",
@@ -63,25 +63,25 @@ const SOURCES = [
     id: "RAM_AREA",
     title: "Carspector, Dodge Ram 1500 2007 frontal area",
     url: "https://carspector.com/car/Dodge/028593/",
-    note: "Surface frontale estimee pour un Dodge Ram 1500 2007.",
+    note: "Surface frontale estimée pour un Dodge Ram 1500 2007.",
   },
   {
     id: "NHTSA",
     title: "NHTSA CAFE technical support document, reference vehicles",
     url: "https://www.nhtsa.gov/sites/nhtsa.gov/files/2021-08/CAFE-NHTSA-2127-AM34-TSD-Complete-web.pdf",
-    note: "Coefficient de resistance au roulement Crr=0,009 repris pour les profils vehicules.",
+    note: "Coefficient de résistance au roulement Crr=0,009 repris pour les profils véhicules.",
   },
   {
     id: "BEDDOWS",
     title: "Beddows & Harrison, Atmospheric Environment 2021",
     url: "https://research.birmingham.ac.uk/en/publications/pmsub10sub-and-pmsub25sub-emission-factors-for-non-exhaust-partic",
-    note: "Dependance des emissions hors echappement a la masse du vehicule.",
+    note: "Dépendance des émissions hors échappement à la masse du véhicule.",
   },
   {
     id: "ISA",
     title: "International Standard Atmosphere, Cambridge Engineering",
     url: "https://www-mdp.eng.cam.ac.uk/web/library/enginfo/aerothermal_dvd_only/aero/atmos/",
-    note: "Densite de l'air au niveau mer et acceleration standard de la pesanteur.",
+    note: "Densité de l'air au niveau mer et accélération standard de la pesanteur.",
   },
   {
     id: "NAP15",
@@ -93,37 +93,37 @@ const SOURCES = [
     id: "DOE",
     title: "U.S. DOE AFDC Fuel Properties",
     url: "https://afdc.energy.gov/fuels/properties?fuels=GS%2CME",
-    note: "Pouvoir calorifique inferieur de l'essence/E10: 112114 a 116090 Btu/gal.",
+    note: "Pouvoir calorifique inférieur de l'essence/E10: 112114 à 116090 Btu/gal.",
   },
   {
     id: "EPA",
     title: "U.S. EPA GHG Equivalencies",
     url: "https://www.epa.gov/energy/greenhouse-gas-equivalencies-calculator-calculations-and-references",
-    note: "Facteur 8887 g CO2 par gallon d'essence consomme.",
+    note: "Facteur 8887 g CO2 par gallon d'essence consommé.",
   },
   {
     id: "EMEP",
     title: "EMEP/EEA Guidebook 2023, tyre and brake wear, update 2025",
     url: "https://www.eea.europa.eu/en/analysis/publications/emep-eea-guidebook-2023/part-b-sectoral-guidance-chapters/1-energy/1-a-combustion/1-a-3-b-vi",
-    note: "Facteurs TSP et fractions PM10/PM2,5 pour pneus, freins et chaussee.",
+    note: "Facteurs TSP et fractions PM10/PM2,5 pour pneus, freins et chaussée.",
   },
   {
     id: "CURVE",
     title: "FHWA Speed Concepts, horizontal curves",
     url: "https://highways.dot.gov/safety/speed-management/speed-concepts-informational-guide/chapter-4-engineering-and-technical",
-    note: "Facteur de frottement lateral utilise comme proxy de l'acceleration laterale non compensee.",
+    note: "Facteur de frottement latéral utilisé comme proxy de l'accélération latérale non compensée.",
   },
   {
     id: "COMFORT",
     title: "Transportation Research Part F, deceleration comfort, 2025",
     url: "https://www.sciencedirect.com/science/article/pii/S1369847825002372",
-    note: "Essais passagers: decelerations de -1,5 a -2,5 m/s2 perçues comme confortables et sures.",
+    note: "Essais passagers: décélérations de -1,5 à -2,5 m/s2 perçues comme confortables et sûres.",
   },
   {
     id: "BRAKE",
     title: "Xu et al., Journal of Hazardous Materials, 2022",
     url: "https://pubmed.ncbi.nlm.nih.gov/35413517/",
-    note: "Les pertes d'energie cinetique peuvent parametrer les variations de particules de freinage.",
+    note: "Les pertes d'énergie cinétique peuvent paramétrer les variations de particules de freinage.",
   },
   {
     id: "PHOTO_NOTE",
@@ -386,24 +386,24 @@ const VEHICLES = {
 };
 
 const LEDGER = [
-  ["Points de depart et arrivee", "Super U Passy -> Maison medicale du Plateau d'Assy", ["SUPERU", "MED"]],
-  ["Distance routiere", "10,2351 km, geometrie OSM D39 / D43 / D13 / D43", ["OSM"]],
+  ["Points de départ et arrivée", "Super U Passy -> Maison médicale du Plateau d'Assy", ["SUPERU", "MED"]],
+  ["Distance routière", "10,2351 km, géométrie OSM D39 / D43 / D13 / D43", ["OSM"]],
   ["Fond de carte", "Tuiles https://tile.openstreetmap.org/{z}/{x}/{y}.png", ["OSMTILES"]],
-  ["Altitudes", "45 points EU-DEM 25 m, 578,1 a 1038,7 m", ["OTD"]],
-  ["Virages", "Rayons deduits de la geometrie OSM; v = sqrt(a_lateral x R)", ["OSM", "CURVE"]],
+  ["Altitudes", "45 points EU-DEM 25 m, 578,1 à 1038,7 m", ["OTD"]],
+  ["Virages", "Rayons déduits de la géométrie OSM; v = sqrt(a_lateral x R)", ["OSM", "CURVE"]],
   ["Bilan des forces", "F = m a + Crr m g cos(theta) + 0,5 rho Cd A v2 + m g sin(theta)", ["DYN"]],
-  ["Cinematique freinage", "v2 = v0 2 + 2 a s", ["DYN", "COMFORT"]],
-  ["Vehicule Nissan Note", "m=1118 kg; Cd=0,30; A=2,25 m2; Crr=0,009; eta=22 %", ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15"]],
-  ["Vehicule BMW X5 4.8is", "m=2275 kg; Cd=0,38; A=2,74 m2; Crr=0,009; eta=22 %", ["X5_SPEC", "NHTSA", "NAP15"]],
-  ["Vehicule Dodge Ram 1500", "m=2366 kg; Cd=0,53; A=3,31 m2; Crr=0,009; eta=22 %", ["RAM_SPEC", "RAM_AREA", "NHTSA", "NAP15"]],
-  ["Photos vehicules", "Images du selecteur, licence indiquee sur chaque fiche Commons", ["PHOTO_NOTE", "PHOTO_X5", "PHOTO_RAM"]],
-  ["Air et gravite", "rho = 1,225 kg/m3; g = 9,80665 m/s2", ["ISA"]],
-  ["Essence", "PCI = 31,82 MJ/L, derive de 112114-116090 Btu/gal", ["DOE"]],
+  ["Cinématique freinage", "v2 = v0 2 + 2 a s", ["DYN", "COMFORT"]],
+  ["Véhicule Nissan Note", "m=1118 kg; Cd=0,30; A=2,25 m2; Crr=0,009; eta=22 %", ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15"]],
+  ["Véhicule BMW X5 4.8is", "m=2275 kg; Cd=0,38; A=2,74 m2; Crr=0,009; eta=22 %", ["X5_SPEC", "NHTSA", "NAP15"]],
+  ["Véhicule Dodge Ram 1500", "m=2366 kg; Cd=0,53; A=3,31 m2; Crr=0,009; eta=22 %", ["RAM_SPEC", "RAM_AREA", "NHTSA", "NAP15"]],
+  ["Photos véhicules", "Images du sélecteur, licence indiquée sur chaque fiche Commons", ["PHOTO_NOTE", "PHOTO_X5", "PHOTO_RAM"]],
+  ["Air et gravité", "rho = 1,225 kg/m3; g = 9,80665 m/s2", ["ISA"]],
+  ["Essence", "PCI = 31,82 MJ/L, dérivé de 112114-116090 Btu/gal", ["DOE"]],
   ["CO2 essence", "8887 g CO2/gal = 2,35 kg CO2/L", ["EPA"]],
   ["Pneus", "TSP = 0,0107 g/km x m/m_Note; PM10/TSP = 0,60; PM2,5/TSP = 0,42", ["EMEP", "BEDDOWS"]],
   ["Freins", "TSP = 0,0142 g/km x m/m_Note x max(1, max_25..V(Efrein + Ecin_perdue)/(Efrein_45 + Ecin_perdue_45)); PM10/TSP = 0,98; PM2,5/TSP = 0,39", ["EMEP", "BRAKE", "BEDDOWS"]],
-  ["Chaussee", "TSP = 0,0150 g/km x m/m_Note; PM10/TSP = 0,50; PM2,5/TSP = 0,27", ["EMEP", "BEDDOWS"]],
-  ["Spatialisation freins", "Part de PM freinage proportionnelle a l'energie dissipee localement", ["BRAKE", "EMEP"]],
+  ["Chaussée", "TSP = 0,0150 g/km x m/m_Note; PM10/TSP = 0,50; PM2,5/TSP = 0,27", ["EMEP", "BEDDOWS"]],
+  ["Spatialisation freins", "Part de PM freinage proportionnelle à l'énergie dissipée localement", ["BRAKE", "EMEP"]],
 ];
 
 const els = {};
@@ -553,7 +553,7 @@ function getDirectionalRoute(direction) {
   if (direction === "up") {
     return {
       direction,
-      label: "Super U Passy -> Maison medicale du Plateau d'Assy",
+      label: "Super U Passy -> Maison médicale du Plateau d'Assy",
       distanceM: ROUTE.distanceM,
       points: uphillPoints,
       curves: uphillCurves,
@@ -564,7 +564,7 @@ function getDirectionalRoute(direction) {
   if (direction === "round") {
     return {
       direction,
-      label: "Aller-retour Super U Passy <-> Maison medicale du Plateau d'Assy",
+      label: "Aller-retour Super U Passy <-> Maison médicale du Plateau d'Assy",
       distanceM: ROUTE.distanceM * 2,
       points: [
         ...uphillPoints,
@@ -584,7 +584,7 @@ function getDirectionalRoute(direction) {
 
   return {
     direction,
-    label: "Maison medicale du Plateau d'Assy -> Super U Passy",
+    label: "Maison médicale du Plateau d'Assy -> Super U Passy",
     distanceM: ROUTE.distanceM,
     points: downhillPoints,
     curves: downhillCurves,
@@ -810,8 +810,8 @@ function renderRouteFacts(route) {
   document.getElementById("routeFacts").innerHTML = [
     ["Trajet", route.label],
     ["Distance", fmt(route.distanceM / 1000, 2, " km")],
-    ["Denivele", elevationFact],
-    ["Virages", `${route.curves.length} detectes`],
+    ["Dénivelé", elevationFact],
+    ["Virages", `${route.curves.length} détectés`],
   ]
     .map(([label, value]) => `<div class="fact"><strong>${value}</strong><span>${label}</span></div>`)
     .join("");
@@ -838,12 +838,12 @@ function renderMetrics(a, b) {
   const vehicleRefs = getVehicleCalculationSources();
   const rows = [
     ["Carburant", "fuelL", " L", 2, true, ["DYN", "OTD", "CURVE", "COMFORT", "NAP15", "DOE", ...vehicleRefs], "Bilan longitudinal, rendement moteur et PCI essence."],
-    ["Consommation", "fuelLPer100", " L/100 km", 1, true, ["DYN", "OSM", "OTD", "NAP15", "DOE", ...vehicleRefs], "Carburant simule rapporte a la distance routiere."],
-    ["CO2 echappement", "co2Kg", " kg", 2, true, ["DYN", "DOE", "EPA", "NAP15", ...vehicleRefs], "Litres d'essence multiplies par le facteur CO2 essence."],
-    ["PM10 hors echappement", "pm10Mg", " mg", 0, true, ["EMEP", "BEDDOWS", "BRAKE", "OSM", ...vehicleRefs], "Facteurs pneus, freins et chaussee modules par masse et freinage."],
-    ["PM2,5 hors echappement", "pm25Mg", " mg", 0, true, ["EMEP", "BEDDOWS", "BRAKE", "OSM", ...vehicleRefs], "Fractions PM2,5 appliquees aux emissions hors echappement."],
-    ["Temps", "timeMin", " min", 1, false, ["OSM", "CURVE", "COMFORT"], "Distance segmentee divisee par le profil de vitesse local."],
-    ["Vitesse moyenne", "avgKmh", " km/h", 1, false, ["OSM", "CURVE", "COMFORT"], "Distance routiere divisee par le temps simule."],
+    ["Consommation", "fuelLPer100", " L/100 km", 1, true, ["DYN", "OSM", "OTD", "NAP15", "DOE", ...vehicleRefs], "Carburant simulé rapporté à la distance routière."],
+    ["CO2 échappement", "co2Kg", " kg", 2, true, ["DYN", "DOE", "EPA", "NAP15", ...vehicleRefs], "Litres d'essence multipliés par le facteur CO2 essence."],
+    ["PM10 hors échappement", "pm10Mg", " mg", 0, true, ["EMEP", "BEDDOWS", "BRAKE", "OSM", ...vehicleRefs], "Facteurs pneus, freins et chaussée modulés par masse et freinage."],
+    ["PM2,5 hors échappement", "pm25Mg", " mg", 0, true, ["EMEP", "BEDDOWS", "BRAKE", "OSM", ...vehicleRefs], "Fractions PM2,5 appliquées aux émissions hors échappement."],
+    ["Temps", "timeMin", " min", 1, false, ["OSM", "CURVE", "COMFORT"], "Distance segmentée divisée par le profil de vitesse local."],
+    ["Vitesse moyenne", "avgKmh", " km/h", 1, false, ["OSM", "CURVE", "COMFORT"], "Distance routière divisée par le temps simulé."],
   ];
 
   document.getElementById("metrics").innerHTML = rows
@@ -888,7 +888,7 @@ function metricSourceTooltip(id, note, refs) {
       <div>
         ${uniqueRefs.map((ref) => {
           const source = sourceById[ref];
-          return `<span><b>${ref}</b><small>${source ? source.title : "Source documentee"}</small></span>`;
+          return `<span><b>${ref}</b><small>${source ? source.title : "Source documentée"}</small></span>`;
         }).join("")}
       </div>
     </div>
@@ -903,13 +903,13 @@ function renderBreakdown(a, b) {
   const pmRows = [
     ["Pneus", a.tyrePm10Mg, b.tyrePm10Mg],
     ["Freins", a.brakePm10Mg, b.brakePm10Mg],
-    ["Chaussee", a.roadPm10Mg, b.roadPm10Mg],
+    ["Chaussée", a.roadPm10Mg, b.roadPm10Mg],
   ];
   const maxPm = Math.max(...pmRows.flatMap(([, valueA, valueB]) => [valueA, valueB]), 1);
   document.getElementById("breakdown").innerHTML = `
     <section class="breakdown-section">
       <div class="breakdown-title">
-        <span>PM10 hors echappement</span>
+        <span>PM10 hors échappement</span>
         <small>mg</small>
       </div>
       <div class="vertical-chart pm-chart">
@@ -924,10 +924,10 @@ function renderBreakdown(a, b) {
     </section>
 
     <details class="advanced-breakdown">
-      <summary>Avance</summary>
+      <summary>Avancé</summary>
       <section class="breakdown-section">
         <div class="breakdown-title">
-          <span>Energie positive aux roues</span>
+          <span>Énergie positive aux roues</span>
           <small>kWh</small>
         </div>
         <div class="vertical-chart energy-chart">
@@ -937,7 +937,7 @@ function renderBreakdown(a, b) {
       </section>
       <section class="breakdown-section">
         <div class="breakdown-title">
-          <span>Energie freinee</span>
+          <span>Énergie freinée</span>
           <small>kWh</small>
         </div>
         <div class="vertical-chart energy-chart">
@@ -1099,12 +1099,12 @@ function drawMap(route) {
   const turn = Number.isInteger(route.turnMapIndex) ? xy(projected[route.turnMapIndex]) : null;
   const endpoints = route.direction === "round"
     ? `
-      ${renderEndpointSvg(start, "Depart / arrivee", "#2f7d63", 12, -13)}
+      ${renderEndpointSvg(start, "Départ / arrivée", "#2f7d63", 12, -13)}
       ${turn ? renderEndpointSvg(turn, "Demi-tour", "#b46b20", 12, 22) : ""}
     `
     : `
-      ${renderEndpointSvg(start, "Depart", "#2f7d63", 12, -13)}
-      ${renderEndpointSvg(end, "Arrivee", "#b46b20", 12, 22)}
+      ${renderEndpointSvg(start, "Départ", "#2f7d63", 12, -13)}
+      ${renderEndpointSvg(end, "Arrivée", "#b46b20", 12, 22)}
     `;
 
   map.innerHTML = `

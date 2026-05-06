@@ -9,15 +9,15 @@
   <body>
     <header class="app-header">
       <div>
-        <p class="eyebrow">Super U Passy - Maison medicale du Plateau d'Assy</p>
+        <p class="eyebrow">Super U Passy - Maison médicale du Plateau d'Assy</p>
         <h1>Vitesse, carburant et particules</h1>
         <p class="lede">
-          Profil de montagne, freinage avant les virages, montee ou descente, avec sources
-          scientifiques rattachees aux formules et aux constantes. Trace par D39, D43,
+          Profil de montagne, freinage avant les virages, montée ou descente, avec sources
+          scientifiques rattachées aux formules et aux constantes. Tracé par D39, D43,
           D13 puis D43.
         </p>
       </div>
-      <div class="route-badge" aria-label="resume du profil">
+      <div class="route-badge" aria-label="résumé du profil">
         <strong id="routeDistance">10,24 km</strong>
         <span id="routeClimb">+442 m</span>
       </div>
@@ -26,19 +26,19 @@
     <main class="workspace">
       <section class="tool-panel control-panel" aria-labelledby="controls-title">
         <div class="panel-title">
-          <span class="panel-kicker">Parametres</span>
+          <span class="panel-kicker">Paramètres</span>
           <h2 id="controls-title">Comparer deux conduites</h2>
         </div>
 
         <fieldset class="segmented" aria-label="sens du trajet">
           <legend>Sens</legend>
           <button type="button" data-direction="down">Descente</button>
-          <button type="button" class="is-active" data-direction="up">Montee</button>
-          <button type="button" data-direction="round">Montee + descente</button>
+          <button type="button" class="is-active" data-direction="up">Montée</button>
+          <button type="button" data-direction="round">Montée + descente</button>
         </fieldset>
 
-        <fieldset class="vehicle-picker" aria-label="choix du vehicule">
-          <legend>Vehicule</legend>
+        <fieldset class="vehicle-picker" aria-label="choix du véhicule">
+          <legend>Véhicule</legend>
           <button type="button" class="is-active" data-vehicle="note">
             <img
               src="https://commons.wikimedia.org/wiki/Special:FilePath/Nissan_Note_2013_%28E12%29_%28cropped%29.jpg?width=360"
@@ -82,13 +82,13 @@
           </label>
 
           <label class="control">
-            <span>Confort lateral</span>
+            <span>Confort latéral</span>
             <output id="latOut">1,47 m/s2</output>
             <input id="latAccel" type="range" min="0.8" max="3.0" step="0.01" value="1.47" />
           </label>
 
           <label class="control">
-            <span>Accel. / freinage</span>
+            <span>Accél. / freinage</span>
             <output id="longOut">1,50 m/s2</output>
             <input id="longAccel" type="range" min="0.7" max="3.0" step="0.05" value="1.5" />
           </label>
@@ -107,13 +107,13 @@
             <span><i class="swatch swatch-brake"></i>freinage</span>
           </div>
         </div>
-        <canvas id="profileCanvas" width="1120" height="500" aria-label="profil altimetrique et vitesses"></canvas>
+        <canvas id="profileCanvas" width="1120" height="500" aria-label="profil altimétrique et vitesses"></canvas>
         <div class="map-block">
           <div class="map-title">
-            <span>Carte du trace</span>
+            <span>Carte du tracé</span>
             <small>fond OpenStreetMap</small>
           </div>
-          <div id="mapView" class="map-view" role="img" aria-label="fond de carte OpenStreetMap avec le trace routier">
+          <div id="mapView" class="map-view" role="img" aria-label="fond de carte OpenStreetMap avec le tracé routier">
             <div class="map-loading">Chargement du fond de carte</div>
           </div>
         </div>
@@ -122,8 +122,8 @@
 
       <section class="tool-panel result-panel" aria-labelledby="results-title">
         <div class="panel-title">
-          <span class="panel-kicker">Resultats</span>
-          <h2 id="results-title">Impact estime</h2>
+          <span class="panel-kicker">Résultats</span>
+          <h2 id="results-title">Impact estimé</h2>
         </div>
         <div class="metric-stack" id="metrics"></div>
         <div class="breakdown" id="breakdown"></div>
@@ -136,25 +136,25 @@
           <span class="panel-kicker">Transparence</span>
           <h2 id="method-title">Formules, constantes et sources</h2>
         </div>
-        <button class="plain-button" id="resetButton" type="button">Reinitialiser</button>
+        <button class="plain-button" id="resetButton" type="button">Réinitialiser</button>
       </div>
       <div class="method-grid">
         <article>
-          <h3>Modele physique</h3>
+          <h3>Modèle physique</h3>
           <p>
-            Le bilan additionne inertie, roulement, aerodynamique et pente. Le carburant est
-            calcule a partir de l'energie positive aux roues divisee par un rendement moteur.
-            Les particules PM10 et PM2,5 suivent la methode EMEP/EEA pour usure pneus,
-            freins et chaussee.
+            Le bilan additionne inertie, roulement, aérodynamique et pente. Le carburant est
+            calculé à partir de l'énergie positive aux roues divisée par un rendement moteur.
+            Les particules PM10 et PM2,5 suivent la méthode EMEP/EEA pour usure pneus,
+            freins et chaussée.
           </p>
         </article>
         <article>
           <h3>Limites</h3>
           <p>
             Ce prototype vulgarise les ordres de grandeur. Il ne remplace pas COPERT, MOVES,
-            des mesures embarquees, ni un releve routier officiel. Les emissions de frein gardent
-            l'ordre de grandeur EMEP/EEA, mais leur total est module par une demande de
-            freinage monotone sur la plage du curseur, pour eviter qu'une conduite plus rapide
+            des mesures embarquées, ni un relevé routier officiel. Les émissions de frein gardent
+            l'ordre de grandeur EMEP/EEA, mais leur total est modulé par une demande de
+            freinage monotone sur la plage du curseur, pour éviter qu'une conduite plus rapide
             abaisse artificiellement les particules.
           </p>
         </article>
@@ -164,7 +164,7 @@
           <table class="source-table">
             <thead>
               <tr>
-                <th>Element</th>
+                <th>Élément</th>
                 <th>Valeur / formule</th>
                 <th>Source</th>
               </tr>
