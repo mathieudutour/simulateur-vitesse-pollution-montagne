@@ -36,6 +36,12 @@ const SOURCES = [
     note: "Adresse du point de départ: 91 avenue de Marlioz, 74190 Passy.",
   },
   {
+    id: "FUELPRICE",
+    title: "Prix-carburants.gouv.fr, flux instantané",
+    url: "https://www.prix-carburants.gouv.fr/rubrique/opendata/",
+    note: "Station 74190003, Super U Passy: SP95-E10/E10 = 1,989 €/L, relevé déclaré le 25/03/2026 09:38:14.",
+  },
+  {
     id: "MED",
     title: "Ville de Passy, Maison médicale du Plateau d'Assy",
     url: "https://www.ville-passy-mont-blanc.fr/maison-medicale-du-plateau-dassy-passy/",
@@ -401,6 +407,7 @@ const CONSTANTS = {
   g: 9.80665,
   rho: 1.225,
   gasolineLhvMJPerL: 31.82,
+  fuelPriceEurPerL: 1.989,
   co2KgPerL: 8.887 / 3.785411784,
   tyreTspGKm: 0.0107,
   brakeTspGKm: 0.0142,
@@ -467,6 +474,7 @@ const LEDGER = [
   ["Photos véhicules", "Images du sélecteur, licence indiquée sur chaque fiche Commons", ["PHOTO_NOTE", "PHOTO_X5", "PHOTO_RAM"]],
   ["Air et gravité", "rho = 1,225 kg/m3; g = 9,80665 m/s2", ["ISA"]],
   ["Essence", "PCI = 31,82 MJ/L, dérivé de 112114-116090 Btu/gal", ["DOE"]],
+  ["Prix essence Super U", "SP95-E10 = 1,989 €/L, station 74190003, relevé du 25/03/2026 09:38", ["FUELPRICE", "SUPERU"]],
   ["CO2 essence", "8887 g CO2/gal = 2,35 kg CO2/L", ["EPA"]],
   ["Pneus", "TSP = 0,0107 g/km x m/m_Note; PM10/TSP = 0,60; PM2,5/TSP = 0,42", ["EMEP", "BEDDOWS"]],
   ["Freins", "TSP = 0,0142 g/km x m/m_Note x max(1, max_25..V(Efrein + Ecin_perdue)/(Efrein_45 + Ecin_perdue_45)); PM10/TSP = 0,98; PM2,5/TSP = 0,39", ["EMEP", "BRAKE", "BEDDOWS"]],
@@ -823,6 +831,7 @@ function simulate(targetKmh, params, route) {
 
   const fuelEnergyJ = tractionJ / Math.max(params.efficiency, 0.01);
   const fuelL = fuelEnergyJ / (CONSTANTS.gasolineLhvMJPerL * 1e6);
+  const fuelCostEur = fuelL * CONSTANTS.fuelPriceEurPerL;
   const distanceKm = distanceM / 1000;
   const avgKmh = (distanceKm / (timeS / 3600));
   const massScale = params.mass / VEHICLES.note.mass;
@@ -854,6 +863,7 @@ function simulate(targetKmh, params, route) {
     timeMin: timeS / 60,
     avgKmh,
     fuelL,
+    fuelCostEur,
     fuelLPer100: (fuelL / distanceKm) * 100,
     co2Kg: fuelL * CONSTANTS.co2KgPerL,
     tractionKWh: tractionJ / 3.6e6,
@@ -983,6 +993,7 @@ function renderMetrics(a, b) {
   const speedRefs = ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132"];
   const rows = [
     ["Carburant", "fuelL", " L", 2, true, ["DYN", "OTD", "CURVE", "COMFORT", "NAP15", "DOE", ...speedRefs, ...vehicleRefs], "Bilan longitudinal, rendement moteur et PCI essence."],
+    ["Coût carburant", "fuelCostEur", " €", 2, true, ["FUELPRICE", "DYN", "DOE", "NAP15", ...speedRefs, ...vehicleRefs], "Litres simulés multipliés par le prix SP95-E10 déclaré pour Super U Passy."],
     ["Consommation", "fuelLPer100", " L/100 km", 1, true, ["DYN", "OTD", "NAP15", "DOE", ...speedRefs, ...vehicleRefs], "Carburant simulé rapporté à la distance routière."],
     ["CO2 échappement", "co2Kg", " kg", 2, true, ["DYN", "DOE", "EPA", "NAP15", ...speedRefs, ...vehicleRefs], "Litres d'essence multipliés par le facteur CO2 essence."],
     ["PM10 hors échappement", "pm10Mg", " mg", 0, true, ["EMEP", "BEDDOWS", "BRAKE", ...speedRefs, ...vehicleRefs], "Facteurs pneus, freins et chaussée modulés par masse, limites de vitesse et freinage."],

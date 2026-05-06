@@ -18,6 +18,8 @@ Le modèle est volontairement transparent:
   roue libre au-dessus de la consigne et freine seulement pour une limite ou un virage;
 - le carburant est dérivé de l'énergie positive aux roues, du rendement moteur et du PCI de
   l'essence;
+- le coût carburant multiplie les litres simulés par le prix SP95-E10 déclaré dans le flux
+  officiel prix-carburants.gouv.fr pour le Super U Passy;
 - les particules pneus, freins et chaussée utilisent les facteurs EMEP/EEA;
 - les facteurs pneus et chaussée sont mis à l'échelle par la masse du véhicule, pas réduits
   par la vitesse;
