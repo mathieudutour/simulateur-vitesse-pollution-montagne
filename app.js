@@ -992,8 +992,8 @@ function renderMetrics(a, b) {
   const vehicleRefs = getVehicleCalculationSources();
   const speedRefs = ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132"];
   const rows = [
-    ["Carburant", "fuelL", " L", 2, true, ["DYN", "OTD", "CURVE", "COMFORT", "NAP15", "DOE", ...speedRefs, ...vehicleRefs], "Bilan longitudinal, rendement moteur et PCI essence."],
-    ["Coût carburant", "fuelCostEur", " €", 2, true, ["FUELPRICE", "DYN", "DOE", "NAP15", ...speedRefs, ...vehicleRefs], "Litres simulés multipliés par le prix SP95-E10 déclaré pour Super U Passy."],
+    ["Carburant", "fuelL", " L", 2, true, ["DYN", "OTD", "CURVE", "COMFORT", "NAP15", "DOE", ...speedRefs, ...vehicleRefs], "Bilan longitudinal, rendement moteur et PCI essence.", "percent", "compact"],
+    [`Coût carburant <small>${fmt(CONSTANTS.fuelPriceEurPerL, 3, " €/L")}</small>`, "fuelCostEur", " €", 2, true, ["FUELPRICE", "DYN", "DOE", "NAP15", ...speedRefs, ...vehicleRefs], "Litres simulés multipliés par le prix SP95-E10 déclaré pour Super U Passy.", "absolute", "compact"],
     ["Consommation", "fuelLPer100", " L/100 km", 1, true, ["DYN", "OTD", "NAP15", "DOE", ...speedRefs, ...vehicleRefs], "Carburant simulé rapporté à la distance routière."],
     ["CO2 échappement", "co2Kg", " kg", 2, true, ["DYN", "DOE", "EPA", "NAP15", ...speedRefs, ...vehicleRefs], "Litres d'essence multipliés par le facteur CO2 essence."],
     ["PM10 hors échappement", "pm10Mg", " mg", 0, true, ["EMEP", "BEDDOWS", "BRAKE", ...speedRefs, ...vehicleRefs], "Facteurs pneus, freins et chaussée modulés par masse, limites de vitesse et freinage."],
@@ -1003,11 +1003,11 @@ function renderMetrics(a, b) {
   ];
 
   document.getElementById("metrics").innerHTML = rows
-    .map(([label, key, unit, digits, lowerIsBetter, refs, note, deltaMode], index) => metricTemplate(label, a, b, key, unit, digits, lowerIsBetter, refs, note, index, deltaMode))
+    .map(([label, key, unit, digits, lowerIsBetter, refs, note, deltaMode, density], index) => metricTemplate(label, a, b, key, unit, digits, lowerIsBetter, refs, note, index, deltaMode, density))
     .join("");
 }
 
-function metricTemplate(label, a, b, key, unit, digits, lowerIsBetter, refs, note, index, deltaMode = "percent") {
+function metricTemplate(label, a, b, key, unit, digits, lowerIsBetter, refs, note, index, deltaMode = "percent", density = "") {
   const delta = b[key] - a[key];
   const pct = a[key] === 0 ? 0 : (delta / a[key]) * 100;
   const worse = lowerIsBetter ? delta > 0 : delta < 0;
@@ -1017,7 +1017,7 @@ function metricTemplate(label, a, b, key, unit, digits, lowerIsBetter, refs, not
     : `${sign}${fmt(pct, 0, " %")}`;
   const tooltipId = `metric-source-${index}`;
   return `
-    <article class="metric" tabindex="0" aria-describedby="${tooltipId}">
+    <article class="metric ${density ? `metric-${density}` : ""}" tabindex="0" aria-describedby="${tooltipId}">
       <div class="metric-head">
         <span>${label}</span>
         <span class="delta ${worse ? "is-worse" : ""}">${deltaLabel}</span>
