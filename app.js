@@ -842,26 +842,29 @@ function renderMetrics(a, b) {
     ["CO2 échappement", "co2Kg", " kg", 2, true, ["DYN", "DOE", "EPA", "NAP15", ...vehicleRefs], "Litres d'essence multipliés par le facteur CO2 essence."],
     ["PM10 hors échappement", "pm10Mg", " mg", 0, true, ["EMEP", "BEDDOWS", "BRAKE", "OSM", ...vehicleRefs], "Facteurs pneus, freins et chaussée modulés par masse et freinage."],
     ["PM2,5 hors échappement", "pm25Mg", " mg", 0, true, ["EMEP", "BEDDOWS", "BRAKE", "OSM", ...vehicleRefs], "Fractions PM2,5 appliquées aux émissions hors échappement."],
-    ["Temps", "timeMin", " min", 1, false, ["OSM", "CURVE", "COMFORT"], "Distance segmentée divisée par le profil de vitesse local."],
+    ["Temps", "timeMin", " min", 1, true, ["OSM", "CURVE", "COMFORT"], "Distance segmentée divisée par le profil de vitesse local.", "absolute"],
     ["Vitesse moyenne", "avgKmh", " km/h", 1, false, ["OSM", "CURVE", "COMFORT"], "Distance routière divisée par le temps simulé."],
   ];
 
   document.getElementById("metrics").innerHTML = rows
-    .map(([label, key, unit, digits, lowerIsBetter, refs, note], index) => metricTemplate(label, a, b, key, unit, digits, lowerIsBetter, refs, note, index))
+    .map(([label, key, unit, digits, lowerIsBetter, refs, note, deltaMode], index) => metricTemplate(label, a, b, key, unit, digits, lowerIsBetter, refs, note, index, deltaMode))
     .join("");
 }
 
-function metricTemplate(label, a, b, key, unit, digits, lowerIsBetter, refs, note, index) {
+function metricTemplate(label, a, b, key, unit, digits, lowerIsBetter, refs, note, index, deltaMode = "percent") {
   const delta = b[key] - a[key];
   const pct = a[key] === 0 ? 0 : (delta / a[key]) * 100;
   const worse = lowerIsBetter ? delta > 0 : delta < 0;
   const sign = delta > 0 ? "+" : "";
+  const deltaLabel = deltaMode === "absolute"
+    ? `${sign}${fmt(delta, digits, unit)}`
+    : `${sign}${fmt(pct, 0, " %")}`;
   const tooltipId = `metric-source-${index}`;
   return `
     <article class="metric" tabindex="0" aria-describedby="${tooltipId}">
       <div class="metric-head">
         <span>${label}</span>
-        <span class="delta ${worse ? "is-worse" : ""}">${sign}${fmt(pct, 0, " %")}</span>
+        <span class="delta ${worse ? "is-worse" : ""}">${deltaLabel}</span>
       </div>
       <div class="metric-values">
         <div><strong>${fmt(a[key], digits, unit)}</strong><span>A ${fmt(a.targetKmh, 0, " km/h")}</span></div>
