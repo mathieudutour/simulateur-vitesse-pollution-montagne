@@ -835,29 +835,31 @@ function summarizeElevation(points) {
 }
 
 function renderMetrics(a, b) {
+  const vehicleRefs = getVehicleCalculationSources();
   const rows = [
-    ["Carburant", "fuelL", " L", 2, true],
-    ["Consommation", "fuelLPer100", " L/100 km", 1, true],
-    ["CO2 echappement", "co2Kg", " kg", 2, true],
-    ["PM10 hors echappement", "pm10Mg", " mg", 0, true],
-    ["PM2,5 hors echappement", "pm25Mg", " mg", 0, true],
-    ["Energie freinee", "brakeKWh", " kWh", 2, true],
-    ["Temps", "timeMin", " min", 1, false],
-    ["Vitesse moyenne", "avgKmh", " km/h", 1, false],
+    ["Carburant", "fuelL", " L", 2, true, ["DYN", "OTD", "CURVE", "COMFORT", "NAP15", "DOE", ...vehicleRefs], "Bilan longitudinal, rendement moteur et PCI essence."],
+    ["Consommation", "fuelLPer100", " L/100 km", 1, true, ["DYN", "OSM", "OTD", "NAP15", "DOE", ...vehicleRefs], "Carburant simule rapporte a la distance routiere."],
+    ["CO2 echappement", "co2Kg", " kg", 2, true, ["DYN", "DOE", "EPA", "NAP15", ...vehicleRefs], "Litres d'essence multiplies par le facteur CO2 essence."],
+    ["PM10 hors echappement", "pm10Mg", " mg", 0, true, ["EMEP", "BEDDOWS", "BRAKE", "OSM", ...vehicleRefs], "Facteurs pneus, freins et chaussee modules par masse et freinage."],
+    ["PM2,5 hors echappement", "pm25Mg", " mg", 0, true, ["EMEP", "BEDDOWS", "BRAKE", "OSM", ...vehicleRefs], "Fractions PM2,5 appliquees aux emissions hors echappement."],
+    ["Energie freinee", "brakeKWh", " kWh", 2, true, ["DYN", "OTD", "CURVE", "COMFORT", "BRAKE", ...vehicleRefs], "Energie dissipee quand le bilan aux roues devient negatif."],
+    ["Temps", "timeMin", " min", 1, false, ["OSM", "CURVE", "COMFORT"], "Distance segmentee divisee par le profil de vitesse local."],
+    ["Vitesse moyenne", "avgKmh", " km/h", 1, false, ["OSM", "CURVE", "COMFORT"], "Distance routiere divisee par le temps simule."],
   ];
 
   document.getElementById("metrics").innerHTML = rows
-    .map(([label, key, unit, digits, lowerIsBetter]) => metricTemplate(label, a, b, key, unit, digits, lowerIsBetter))
+    .map(([label, key, unit, digits, lowerIsBetter, refs, note], index) => metricTemplate(label, a, b, key, unit, digits, lowerIsBetter, refs, note, index))
     .join("");
 }
 
-function metricTemplate(label, a, b, key, unit, digits, lowerIsBetter) {
+function metricTemplate(label, a, b, key, unit, digits, lowerIsBetter, refs, note, index) {
   const delta = b[key] - a[key];
   const pct = a[key] === 0 ? 0 : (delta / a[key]) * 100;
   const worse = lowerIsBetter ? delta > 0 : delta < 0;
   const sign = delta > 0 ? "+" : "";
+  const tooltipId = `metric-source-${index}`;
   return `
-    <article class="metric">
+    <article class="metric" tabindex="0" aria-describedby="${tooltipId}">
       <div class="metric-head">
         <span>${label}</span>
         <span class="delta ${worse ? "is-worse" : ""}">${sign}${fmt(pct, 0, " %")}</span>
@@ -866,7 +868,31 @@ function metricTemplate(label, a, b, key, unit, digits, lowerIsBetter) {
         <div><strong>${fmt(a[key], digits, unit)}</strong><span>A ${fmt(a.targetKmh, 0, " km/h")}</span></div>
         <div><strong>${fmt(b[key], digits, unit)}</strong><span>B ${fmt(b.targetKmh, 0, " km/h")}</span></div>
       </div>
+      ${metricSourceTooltip(tooltipId, note, refs)}
     </article>
+  `;
+}
+
+function getVehicleCalculationSources() {
+  const vehicle = VEHICLES[state.vehicleId] || VEHICLES.note;
+  return vehicle.sources.filter((ref) => !ref.startsWith("PHOTO_"));
+}
+
+function metricSourceTooltip(id, note, refs) {
+  const sourceById = Object.fromEntries(SOURCES.map((source) => [source.id, source]));
+  const uniqueRefs = [...new Set(refs)];
+
+  return `
+    <div class="metric-tooltip" id="${id}" role="tooltip">
+      <strong>Sources de calcul</strong>
+      <p>${note}</p>
+      <div>
+        ${uniqueRefs.map((ref) => {
+          const source = sourceById[ref];
+          return `<span><b>${ref}</b><small>${source ? source.title : "Source documentee"}</small></span>`;
+        }).join("")}
+      </div>
+    </div>
   `;
 }
 

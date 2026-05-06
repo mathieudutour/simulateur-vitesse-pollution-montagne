@@ -509,12 +509,18 @@ canvas {
 }
 
 .metric {
+  position: relative;
   display: grid;
   gap: 8px;
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fbf7ef;
+}
+
+.metric:focus-visible {
+  outline: 2px solid rgba(36, 111, 158, 0.45);
+  outline-offset: 2px;
 }
 
 .metric-head {
@@ -540,6 +546,73 @@ canvas {
 .metric-values span {
   color: var(--muted);
   font-size: 0.74rem;
+}
+
+.metric-tooltip {
+  position: absolute;
+  right: 10px;
+  bottom: calc(100% + 8px);
+  left: 10px;
+  z-index: 30;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(47, 125, 99, 0.28);
+  border-radius: 8px;
+  background: #fffdf8;
+  box-shadow: 0 14px 36px rgba(44, 38, 28, 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease,
+    visibility 140ms ease;
+  visibility: hidden;
+}
+
+.metric:hover .metric-tooltip,
+.metric:focus-visible .metric-tooltip,
+.metric:focus-within .metric-tooltip {
+  opacity: 1;
+  transform: translateY(0);
+  visibility: visible;
+}
+
+.metric-tooltip > strong {
+  color: var(--ink);
+  font-size: 0.78rem;
+}
+
+.metric-tooltip p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.metric-tooltip div {
+  display: grid;
+  gap: 5px;
+}
+
+.metric-tooltip span {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+}
+
+.metric-tooltip b {
+  color: var(--green);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+}
+
+.metric-tooltip small {
+  color: var(--muted);
+  font-size: 0.7rem;
+  line-height: 1.25;
 }
 
 .delta {
