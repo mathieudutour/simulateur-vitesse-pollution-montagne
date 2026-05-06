@@ -12,8 +12,8 @@ Le modèle est volontairement transparent:
 - les forces longitudinales viennent d'un bilan physique véhicule-route;
 - les profils véhicules remplacent les réglages techniques: Nissan Note 2013,
   BMW X5 4.8is 2004, Dodge Ram 1500 SLT/TRX4 2007;
-- le profil de vitesse est plafonné par les limites OSM taguées et par une hypothèse
-  50 km/h en agglomération quand aucun `maxspeed` n'est tagué;
+- le profil de vitesse est plafonné par les limites OSM taguées, par 50 km/h en ville,
+  et par une hypothèse 90 km/h hors ville quand aucun `maxspeed` n'est tagué;
 - le carburant est dérivé de l'énergie positive aux roues, du rendement moteur et du PCI de
   l'essence;
 - les particules pneus, freins et chaussée utilisent les facteurs EMEP/EEA;

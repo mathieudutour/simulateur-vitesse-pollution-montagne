@@ -12,6 +12,12 @@ const SOURCES = [
     note: "En agglomération, la vitesse des véhicules est limitée à 50 km/h, sauf signalisation différente.",
   },
   {
+    id: "LEGIFRANCE_R4132",
+    title: "Code de la route, article R413-2",
+    url: "https://www.legifrance.gouv.fr/loda/article_lc/LEGIARTI000042240048/2022-01-26",
+    note: "Hors agglomération, le code encadre les vitesses maximales; le 90 km/h est utilisé ici comme hypothèse de parcours hors ville.",
+  },
+  {
     id: "OSMTILES",
     title: "OpenStreetMap tile server and attribution",
     url: "https://operations.osmfoundation.org/policies/tiles/",
@@ -239,9 +245,23 @@ const ROUTE = {
     },
     {
       startKm: 0.78,
+      endKm: 1.25,
+      kmh: 50,
+      label: "Sortie de Passy",
+      note: "50 km/h par défaut en agglomération quand OSM ne tague pas maxspeed",
+    },
+    {
+      startKm: 1.25,
+      endKm: 9.05,
+      kmh: 90,
+      label: "Hors ville",
+      note: "Hypothèse 90 km/h sur les tronçons hors agglomération sans maxspeed OSM",
+    },
+    {
+      startKm: 9.05,
       endKm: 10.2351,
       kmh: 50,
-      label: "Tronçons non tagués, hypothèse agglomération",
+      label: "Plateau d'Assy",
       note: "50 km/h par défaut en agglomération quand OSM ne tague pas maxspeed",
     },
   ],
@@ -380,6 +400,7 @@ const CONSTANTS = {
   pmMinKmh: 25,
   pmReferenceKmh: 45,
   urbanSpeedKmh: 50,
+  ruralSpeedKmh: 90,
 };
 
 const VEHICLES = {
@@ -421,8 +442,8 @@ const LEDGER = [
   ["Fond de carte", "Tuiles https://tile.openstreetmap.org/{z}/{x}/{y}.png", ["OSMTILES"]],
   ["Altitudes", "45 points EU-DEM 25 m, 578,1 à 1038,7 m", ["OTD"]],
   ["Virages", "Rayons déduits de la géométrie OSM; v = sqrt(a_lateral x R)", ["OSM", "CURVE"]],
-  ["Limites de vitesse", "maxspeed OSM quand tagué; sinon hypothèse 50 km/h en agglomération", ["OSM", "LEGIFRANCE"]],
-  ["Profil de vitesse", "v = min(v_curseur, v_limite, v_virage), avec approche freinage/accélération", ["OSM", "LEGIFRANCE", "CURVE", "COMFORT"]],
+  ["Limites de vitesse", "maxspeed OSM quand tagué; 50 km/h en ville; hypothèse 90 km/h hors ville", ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132"]],
+  ["Profil de vitesse", "v = min(v_curseur, v_limite, v_virage), avec approche freinage/accélération", ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132", "CURVE", "COMFORT"]],
   ["Bilan des forces", "F = m a + Crr m g cos(theta) + 0,5 rho Cd A v2 + m g sin(theta)", ["DYN"]],
   ["Cinématique freinage", "v2 = v0 2 + 2 a s", ["DYN", "COMFORT"]],
   ["Véhicule Nissan Note", "m=1118 kg; Cd=0,30; A=2,25 m2; Crr=0,009; eta=22 %", ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15"]],
@@ -694,7 +715,7 @@ function speedLimitAt(route, km) {
   const segment = route.speedLimits?.find((limit) => (
     km >= limit.startKm - 1e-6 && km <= limit.endKm + 1e-6
   ));
-  return segment ? segment.kmh : CONSTANTS.urbanSpeedKmh;
+  return segment ? segment.kmh : CONSTANTS.ruralSpeedKmh;
 }
 
 function simulate(targetKmh, params, route) {
@@ -900,10 +921,10 @@ function summarizeSpeedLimits(route) {
 
 function renderMetrics(a, b) {
   const vehicleRefs = getVehicleCalculationSources();
-  const speedRefs = ["OSM", "LEGIFRANCE"];
+  const speedRefs = ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132"];
   const rows = [
     ["Carburant", "fuelL", " L", 2, true, ["DYN", "OTD", "CURVE", "COMFORT", "NAP15", "DOE", ...speedRefs, ...vehicleRefs], "Bilan longitudinal, rendement moteur et PCI essence."],
-    ["Consommation", "fuelLPer100", " L/100 km", 1, true, ["DYN", "OSM", "OTD", "NAP15", "DOE", "LEGIFRANCE", ...vehicleRefs], "Carburant simulé rapporté à la distance routière."],
+    ["Consommation", "fuelLPer100", " L/100 km", 1, true, ["DYN", "OTD", "NAP15", "DOE", ...speedRefs, ...vehicleRefs], "Carburant simulé rapporté à la distance routière."],
     ["CO2 échappement", "co2Kg", " kg", 2, true, ["DYN", "DOE", "EPA", "NAP15", ...speedRefs, ...vehicleRefs], "Litres d'essence multipliés par le facteur CO2 essence."],
     ["PM10 hors échappement", "pm10Mg", " mg", 0, true, ["EMEP", "BEDDOWS", "BRAKE", ...speedRefs, ...vehicleRefs], "Facteurs pneus, freins et chaussée modulés par masse, limites de vitesse et freinage."],
     ["PM2,5 hors échappement", "pm25Mg", " mg", 0, true, ["EMEP", "BEDDOWS", "BRAKE", ...speedRefs, ...vehicleRefs], "Fractions PM2,5 appliquées aux émissions hors échappement."],
