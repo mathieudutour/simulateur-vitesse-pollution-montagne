@@ -430,7 +430,6 @@ const LEDGER = [
   ["Véhicule Nissan Note", "m=1118 kg; Cd=0,30; A=2,25 m2; Crr=0,009; eta=22 %", ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15"]],
   ["Véhicule BMW X5 4.8is", "m=2275 kg; Cd=0,38; A=2,74 m2; Crr=0,009; eta=22 %", ["X5_SPEC", "NHTSA", "NAP15"]],
   ["Véhicule Dodge Ram 1500", "m=2366 kg; Cd=0,53; A=3,31 m2; Crr=0,009; eta=22 %", ["RAM_SPEC", "RAM_AREA", "NHTSA", "NAP15"]],
-  ["Photos véhicules", "Images du sélecteur, licence indiquée sur chaque fiche Commons", ["PHOTO_NOTE", "PHOTO_X5", "PHOTO_RAM"]],
   ["Air et gravité", "rho = 1,225 kg/m3; g = 9,80665 m/s2", ["ISA"]],
   ["Essence", "PCI = 31,82 MJ/L, dérivé de 112114-116090 Btu/gal", ["DOE"]],
   ["Prix essence Super U", "SP95-E10 = 1,989 €/L; flux consulté le 06/05/2026, dernier relevé station du 25/03/2026 09:38", ["FUELPRICE", "SUPERU"]],
