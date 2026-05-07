@@ -126,6 +126,12 @@ const SOURCES = [
     note: "Facteurs TSP et fractions PM10/PM2,5 pour pneus, freins et chaussée.",
   },
   {
+    id: "EMEP_EXHAUST",
+    title: "EMEP/EEA Guidebook 2023, road transport exhaust, update 2025",
+    url: "https://www.eea.europa.eu/en/analysis/publications/emep-eea-guidebook-2023/part-b-sectoral-guidance-chapters/1-energy/1-a-combustion/1-a-3-b-i",
+    note: "Facteur PM échappement essence Euro 5 pris à 0,0014 g/km; PM échappement assimilé à PM2,5 et PM10.",
+  },
+  {
     id: "CURVE",
     title: "FHWA Speed Concepts, horizontal curves",
     url: "https://highways.dot.gov/safety/speed-management/speed-concepts-informational-guide/chapter-4-engineering-and-technical",
@@ -418,6 +424,7 @@ const CONSTANTS = {
   brakePM25: 0.39,
   roadPM10: 0.5,
   roadPM25: 0.27,
+  exhaustPmMgKm: 1.4,
   pmMinKmh: 25,
   pmReferenceKmh: 45,
   urbanSpeedKmh: 50,
@@ -479,6 +486,7 @@ const LEDGER = [
   ["Pneus", "TSP = 0,0107 g/km x m/m_Note; PM10/TSP = 0,60; PM2,5/TSP = 0,42", ["EMEP", "BEDDOWS"]],
   ["Freins", "TSP = 0,0142 g/km x m/m_Note x max(1, max_25..V(Efrein + Ecin_perdue)/(Efrein_45 + Ecin_perdue_45)); PM10/TSP = 0,98; PM2,5/TSP = 0,39", ["EMEP", "BRAKE", "BEDDOWS"]],
   ["Chaussée", "TSP = 0,0150 g/km x m/m_Note; PM10/TSP = 0,50; PM2,5/TSP = 0,27", ["EMEP", "BEDDOWS"]],
+  ["PM échappement essence", "1,4 mg/km; PM échappement ajouté à PM10 total et PM2,5 total", ["EMEP_EXHAUST"]],
   ["Spatialisation freins", "Part de PM freinage proportionnelle à l'énergie dissipée localement", ["BRAKE", "EMEP"]],
 ];
 
@@ -848,6 +856,7 @@ function simulate(targetKmh, params, route) {
     tyreTsp * CONSTANTS.tyrePM25 +
     brakeTsp * CONSTANTS.brakePM25 +
     roadTsp * CONSTANTS.roadPM25;
+  const exhaustPmMg = distanceKm * CONSTANTS.exhaustPmMgKm;
 
   const brakeTotalPm10Mg = brakeTsp * CONSTANTS.brakePM10 * 1000;
   const brakeEnergySum = brakeBySegment.reduce((sum, row) => sum + row.energyJ, 0);
@@ -874,6 +883,9 @@ function simulate(targetKmh, params, route) {
     inertiaKWh: inertiaJ / 3.6e6,
     pm10Mg: pm10G * 1000,
     pm25Mg: pm25G * 1000,
+    exhaustPmMg,
+    totalPm10Mg: pm10G * 1000 + exhaustPmMg,
+    totalPm25Mg: pm25G * 1000 + exhaustPmMg,
     tyrePm10Mg: tyreTsp * CONSTANTS.tyrePM10 * 1000,
     brakePm10Mg: brakeTotalPm10Mg,
     roadPm10Mg: roadTsp * CONSTANTS.roadPM10 * 1000,
@@ -996,6 +1008,8 @@ function renderMetrics(a, b) {
     [`Coût carburant <small>${fmt(CONSTANTS.fuelPriceEurPerL, 3, " €/L")}</small>`, "fuelCostEur", " €", 2, true, ["FUELPRICE", "DYN", "DOE", "NAP15", ...speedRefs, ...vehicleRefs], "Litres simulés multipliés par le prix SP95-E10 déclaré pour Super U Passy.", "absolute", "compact"],
     ["Consommation", "fuelLPer100", " L/100 km", 1, true, ["DYN", "OTD", "NAP15", "DOE", ...speedRefs, ...vehicleRefs], "Carburant simulé rapporté à la distance routière."],
     ["CO2 échappement", "co2Kg", " kg", 2, true, ["DYN", "DOE", "EPA", "NAP15", ...speedRefs, ...vehicleRefs], "Litres d'essence multipliés par le facteur CO2 essence."],
+    ["PM10 total", "totalPm10Mg", " mg", 0, true, ["EMEP", "EMEP_EXHAUST", "BEDDOWS", "BRAKE", ...speedRefs, ...vehicleRefs], "PM10 hors échappement + PM échappement essence, assimilé à PM10."],
+    ["PM2,5 total", "totalPm25Mg", " mg", 0, true, ["EMEP", "EMEP_EXHAUST", "BEDDOWS", "BRAKE", ...speedRefs, ...vehicleRefs], "PM2,5 hors échappement + PM échappement essence."],
     ["PM10 hors échappement", "pm10Mg", " mg", 0, true, ["EMEP", "BEDDOWS", "BRAKE", ...speedRefs, ...vehicleRefs], "Facteurs pneus, freins et chaussée modulés par masse, limites de vitesse et freinage."],
     ["PM2,5 hors échappement", "pm25Mg", " mg", 0, true, ["EMEP", "BEDDOWS", "BRAKE", ...speedRefs, ...vehicleRefs], "Fractions PM2,5 appliquées aux émissions hors échappement."],
     ["Temps", "timeMin", " min", 1, true, ["OSM", "LEGIFRANCE", "CURVE", "COMFORT"], "Distance segmentée divisée par le profil de vitesse plafonné par les limites locales.", "absolute"],

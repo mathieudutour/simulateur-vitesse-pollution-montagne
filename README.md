@@ -21,6 +21,8 @@ Le modèle est volontairement transparent:
 - le coût carburant multiplie les litres simulés par le prix SP95-E10 déclaré dans le flux
   officiel prix-carburants.gouv.fr pour le Super U Passy;
 - les particules pneus, freins et chaussée utilisent les facteurs EMEP/EEA;
+- les PM totaux ajoutent un facteur PM échappement essence EMEP/EEA aux PM hors
+  échappement; PM2,5 n'est pas additionné au PM10 car il en est une fraction;
 - les facteurs pneus et chaussée sont mis à l'échelle par la masse du véhicule, pas réduits
   par la vitesse;
 - le freinage est modulé par une demande de freinage monotone, avec spatialisation locale
