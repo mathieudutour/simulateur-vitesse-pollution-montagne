@@ -1159,12 +1159,12 @@ function drawProfile(route, a, b) {
   const ySpeed = (mps) => pad.top + (1 - (mps * 3.6) / maxSpeed) * innerH;
 
   ctx.clearRect(0, 0, width, height);
-  ctx.fillStyle = "#fbf8f1";
+  ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, width, height);
 
-  ctx.strokeStyle = "#e0d8ca";
+  ctx.strokeStyle = "#e5e7eb";
   ctx.lineWidth = 1;
-  ctx.fillStyle = "#7a827d";
+  ctx.fillStyle = "#4a5565";
   ctx.font = "12px Inter, system-ui, sans-serif";
   for (let i = 0; i <= 4; i += 1) {
     const yy = pad.top + (i / 4) * innerH;
@@ -1182,7 +1182,7 @@ function drawProfile(route, a, b) {
   b.brakePmHotspots.forEach((p) => {
     const alpha = Math.min(0.48, p.mg / hotspotMax);
     if (alpha <= 0.02) return;
-    ctx.fillStyle = `rgba(181, 72, 63, ${alpha})`;
+    ctx.fillStyle = `rgba(228, 0, 20, ${alpha})`;
     ctx.fillRect(x(p.km) - 1.5, pad.top, 3, innerH);
   });
 
@@ -1196,35 +1196,35 @@ function drawProfile(route, a, b) {
   ctx.lineTo(x(totalKm), pad.top + innerH);
   ctx.lineTo(x(0), pad.top + innerH);
   ctx.closePath();
-  ctx.fillStyle = "rgba(47, 125, 99, 0.12)";
+  ctx.fillStyle = "rgba(58, 171, 59, 0.11)";
   ctx.fill();
 
-  drawLine(ctx, route.points, (p) => x(p.km), (p) => yElev(p.elev), "#51635b", 2);
+  drawLine(ctx, route.points, (p) => x(p.km), (p) => yElev(p.elev), "#4a5565", 2);
   ctx.save();
   ctx.setLineDash([6, 5]);
-  drawLine(ctx, speedLimitLinePoints(route), (p) => x(p.km), (p) => ySpeed(kmhToMps(p.kmh)), "#81786c", 2);
+  drawLine(ctx, speedLimitLinePoints(route), (p) => x(p.km), (p) => ySpeed(kmhToMps(p.kmh)), "#6a7282", 2);
   ctx.restore();
-  drawLine(ctx, a.points, (p) => x(p.km), (p) => ySpeed(p.speedMps), "#2f7d63", 3);
-  drawLine(ctx, b.points, (p) => x(p.km), (p) => ySpeed(p.speedMps), "#246f9e", 3);
+  drawLine(ctx, a.points, (p) => x(p.km), (p) => ySpeed(p.speedMps), "#3aab3b", 3);
+  drawLine(ctx, b.points, (p) => x(p.km), (p) => ySpeed(p.speedMps), "#1d6ab2", 3);
 
   route.curves.forEach((curve) => {
     const xx = x(curve.km);
-    ctx.strokeStyle = "rgba(180, 107, 32, 0.7)";
+    ctx.strokeStyle = "rgba(237, 178, 0, 0.82)";
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(xx, pad.top + innerH - 12);
     ctx.lineTo(xx, pad.top + innerH + 6);
     ctx.stroke();
-    ctx.fillStyle = "#b46b20";
+    ctx.fillStyle = "#edb200";
     ctx.beginPath();
     ctx.arc(xx, pad.top + innerH - 14, Math.max(3, Math.min(7, curve.angleDeg / 26)), 0, Math.PI * 2);
     ctx.fill();
   });
 
-  ctx.strokeStyle = "#bdb4a6";
+  ctx.strokeStyle = "#d1d5db";
   ctx.lineWidth = 1;
   ctx.strokeRect(pad.left, pad.top, innerW, innerH);
-  ctx.fillStyle = "#59635e";
+  ctx.fillStyle = "#4a5565";
   ctx.fillText("distance", pad.left + innerW / 2 - 22, height - 14);
   ctx.fillText("km/h", width - 36, pad.top - 8);
 }
@@ -1276,8 +1276,8 @@ function drawMap(route) {
     const pos = xy(point);
     const radius = Math.max(8, Math.min(18, curve.angleDeg / 8));
     return `
-      <circle cx="${pos.x.toFixed(1)}" cy="${pos.y.toFixed(1)}" r="${radius.toFixed(1)}" fill="rgba(180, 107, 32, 0.2)"></circle>
-      <circle cx="${pos.x.toFixed(1)}" cy="${pos.y.toFixed(1)}" r="4" fill="#b46b20"></circle>
+      <circle cx="${pos.x.toFixed(1)}" cy="${pos.y.toFixed(1)}" r="${radius.toFixed(1)}" fill="rgba(237, 178, 0, 0.2)"></circle>
+      <circle cx="${pos.x.toFixed(1)}" cy="${pos.y.toFixed(1)}" r="4" fill="#edb200"></circle>
     `;
   }).join("");
   const start = xy(projected[0]);
@@ -1285,25 +1285,25 @@ function drawMap(route) {
   const turn = Number.isInteger(route.turnMapIndex) ? xy(projected[route.turnMapIndex]) : null;
   const endpoints = route.direction === "round"
     ? `
-      ${renderEndpointSvg(start, "Départ / arrivée", "#2f7d63", 12, -13)}
-      ${turn ? renderEndpointSvg(turn, "Demi-tour", "#b46b20", 12, 22) : ""}
+      ${renderEndpointSvg(start, "Départ / arrivée", "#3aab3b", 12, -13)}
+      ${turn ? renderEndpointSvg(turn, "Demi-tour", "#edb200", 12, 22) : ""}
     `
     : `
-      ${renderEndpointSvg(start, "Départ", "#2f7d63", 12, -13)}
-      ${renderEndpointSvg(end, "Arrivée", "#b46b20", 12, 22)}
+      ${renderEndpointSvg(start, "Départ", "#3aab3b", 12, -13)}
+      ${renderEndpointSvg(end, "Arrivée", "#edb200", 12, 22)}
     `;
 
   map.innerHTML = `
     ${tileLayer}
     <svg viewBox="0 0 ${width} ${height}" aria-hidden="true">
-      <polyline points="${path}" fill="none" stroke="rgba(29,37,34,0.32)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"></polyline>
-      <polyline points="${path}" fill="none" stroke="#fffdf8" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></polyline>
+      <polyline points="${path}" fill="none" stroke="rgba(10,10,10,0.24)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"></polyline>
+      <polyline points="${path}" fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></polyline>
       ${speedPaths}
       ${arrows}
       ${curves}
       ${endpoints}
-      <text x="${width - 32}" y="28" fill="#59635e" font-size="12" font-weight="800">N</text>
-      <path d="M${width - 28} 55 L${width - 28} 34 M${width - 28} 34 L${width - 34} 43 M${width - 28} 34 L${width - 22} 43" fill="none" stroke="#59635e" stroke-width="2" stroke-linecap="round"></path>
+      <text x="${width - 32}" y="28" fill="#4a5565" font-size="12" font-weight="800">N</text>
+      <path d="M${width - 28} 55 L${width - 28} 34 M${width - 28} 34 L${width - 34} 43 M${width - 28} 34 L${width - 22} 43" fill="none" stroke="#4a5565" stroke-width="2" stroke-linecap="round"></path>
     </svg>
     <div class="map-attribution">
       <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors</a>
@@ -1399,7 +1399,7 @@ function renderMapArrows(projected, xy) {
     const angle = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
     return `
       <g transform="translate(${a.x.toFixed(1)} ${a.y.toFixed(1)}) rotate(${angle.toFixed(1)})" opacity="0.72">
-        <path d="M7 0 L-5 -5 L-2 0 L-5 5 Z" fill="#1d2522"></path>
+        <path d="M7 0 L-5 -5 L-2 0 L-5 5 Z" fill="#0a0a0a"></path>
       </g>
     `;
   }).join("");
@@ -1423,9 +1423,9 @@ function projectedRouteSegmentPoints(projected, startFraction, endFraction) {
 
 function renderEndpointSvg(point, label, color, dx, dy) {
   return `
-    <circle cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="7" fill="#fffdf8"></circle>
+    <circle cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="7" fill="#ffffff"></circle>
     <circle cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="5.2" fill="${color}"></circle>
-    <text x="${(point.x + dx).toFixed(1)}" y="${(point.y + dy).toFixed(1)}" fill="#1d2522" font-size="12" font-weight="800" paint-order="stroke" stroke="#fffdf8" stroke-width="3">${label}</text>
+    <text x="${(point.x + dx).toFixed(1)}" y="${(point.y + dy).toFixed(1)}" fill="#0a0a0a" font-size="12" font-weight="800" paint-order="stroke" stroke="#ffffff" stroke-width="3">${label}</text>
   `;
 }
 
@@ -1465,9 +1465,9 @@ function pointAtRouteLength(projected, lengths, target) {
 }
 
 function speedLimitColor(kmh) {
-  if (kmh <= 30) return "#b5483f";
-  if (kmh <= 50) return "#b46b20";
-  return "#2f7d63";
+  if (kmh <= 30) return "#e40014";
+  if (kmh <= 50) return "#edb200";
+  return "#3aab3b";
 }
 
 function drawLine(ctx, points, getX, getY, color, lineWidth) {
