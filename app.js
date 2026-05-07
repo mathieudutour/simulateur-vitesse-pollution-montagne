@@ -6,46 +6,16 @@ const SOURCES = [
     note: "Géométrie de route et tags maxspeed assemblés depuis les voies OSM ref D 39, D 43 et D 13.",
   },
   {
-    id: "LEGIFRANCE",
-    title: "Code de la route, article R413-3",
-    url: "https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000028436430",
-    note: "En agglomération, la vitesse des véhicules est limitée à 50 km/h, sauf signalisation différente.",
-  },
-  {
-    id: "LEGIFRANCE_R4132",
-    title: "Code de la route, article R413-2",
-    url: "https://www.legifrance.gouv.fr/loda/article_lc/LEGIARTI000042240048/2022-01-26",
-    note: "Hors agglomération, le code encadre les vitesses maximales; le 90 km/h est utilisé ici comme hypothèse de parcours hors ville.",
-  },
-  {
-    id: "OSMTILES",
-    title: "OpenStreetMap tile server and attribution",
-    url: "https://operations.osmfoundation.org/policies/tiles/",
-    note: "Fond de carte via tile.openstreetmap.org avec attribution visible.",
-  },
-  {
     id: "OTD",
     title: "Open Topo Data, EU-DEM 25 m",
     url: "https://www.opentopodata.org/",
     note: "Altitudes interrogées sur le jeu européen eudem25m, source EEA.",
   },
   {
-    id: "SUPERU",
-    title: "Magasins U, Super U Passy",
-    url: "https://www.magasins-u.com/magasin/superu-passy",
-    note: "Adresse du point de départ: 91 avenue de Marlioz, 74190 Passy.",
-  },
-  {
     id: "FUELPRICE",
     title: "Prix-carburants.gouv.fr, flux instantané",
     url: "https://www.prix-carburants.gouv.fr/rubrique/opendata/",
     note: "Flux instantané consulté le 06/05/2026; la station 74190003, Super U Passy, y déclare SP95-E10/E10 = 1,989 €/L depuis le 25/03/2026 09:38:14. La page station Super U affiche le même prix.",
-  },
-  {
-    id: "MED",
-    title: "Ville de Passy, Maison médicale du Plateau d'Assy",
-    url: "https://www.ville-passy-mont-blanc.fr/maison-medicale-du-plateau-dassy-passy/",
-    note: "Adresse du point d'arrivée: 50 place Théophile Vallet, 74190 Passy.",
   },
   {
     id: "DYN",
@@ -148,24 +118,6 @@ const SOURCES = [
     title: "Xu et al., Journal of Hazardous Materials, 2022",
     url: "https://pubmed.ncbi.nlm.nih.gov/35413517/",
     note: "Les pertes d'énergie cinétique peuvent paramétrer les variations de particules de freinage.",
-  },
-  {
-    id: "PHOTO_NOTE",
-    title: "Wikimedia Commons, Nissan Note 2013",
-    url: "https://commons.wikimedia.org/wiki/File:Nissan_Note_2013_(E12)_(cropped).jpg",
-    note: "Photo du Nissan Note, licence Creative Commons.",
-  },
-  {
-    id: "PHOTO_X5",
-    title: "Wikimedia Commons, BMW X5 2004-2006",
-    url: "https://commons.wikimedia.org/wiki/File:BMW-X5.jpg",
-    note: "Photo du BMW X5, domaine public selon la fiche Commons.",
-  },
-  {
-    id: "PHOTO_RAM",
-    title: "Wikimedia Commons, Dodge Ram 1500 SLT 2007",
-    url: "https://commons.wikimedia.org/wiki/File:Dodge_Ram_1500_SLT_2007_(14335882789).jpg",
-    note: "Photo du Dodge Ram 1500, licence Creative Commons.",
   },
 ];
 
