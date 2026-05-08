@@ -29,8 +29,14 @@ positif et compris entre +0,15 et +0,40 L pour la Nissan Note, et entre
 Δ_E_frein(SUV) / Δ_E_frein(Note) est supérieur à 1,5 (l'effet masse
 amplifie l'écart).
 
-**H4 — Distance "moteur saturé"** est nulle pour la Note à 50 km/h, et
-strictement positive pour le pick-up à 90 km/h en montée.
+**H4 — Distance "moteur saturé"** est strictement positive pour la
+Nissan Note (58 W/kg) sur les segments les plus pentus de la montée
+et nulle pour le BMW X5 (118 W/kg) et le Dodge Ram (107 W/kg) — c'est
+la *citadine* qui se sature, pas les profils lourds, parce que le
+rapport puissance / masse est plus faible. Vérifiable simplement par
+chronométrage du tronçon km 6,4 → km 6,7 (pente locale ~10 %) :
+écart prédit Δ_temps_local entre 50 et 90 km/h plus faible pour la
+Note que pour les SUV / pick-up.
 
 Les hypothèses H1–H3 portent sur des **différences appariées**, pas sur
 les valeurs absolues. Le simulateur peut être systématiquement

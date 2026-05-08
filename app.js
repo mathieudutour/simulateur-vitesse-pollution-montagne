@@ -572,7 +572,7 @@ const LEDGER = [
 const els = {};
 let state = { ...DEFAULTS };
 
-document.addEventListener("DOMContentLoaded", () => {
+if (typeof document !== "undefined") document.addEventListener("DOMContentLoaded", () => {
   [
     "speedA",
     "speedB",
@@ -1712,4 +1712,21 @@ function fmt(value, digits = 0, suffix = "") {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   })}${suffix}`;
+}
+
+// Node-only export shim so the model can be driven by sensitivity.js without a browser.
+// `typeof module` is undefined in the browser; this block is therefore inert there.
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    CONSTANTS,
+    VEHICLES,
+    ROUTE,
+    simulate,
+    getDirectionalRoute,
+    buildSpeedProfile,
+    poweredAccel,
+    coastingAcceleration,
+    airDensity,
+    effectiveCrr,
+  };
 }
