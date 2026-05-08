@@ -162,6 +162,12 @@ const SOURCES = [
     note: "Essais passagers: décélérations de -1,5 à -2,5 m/s2 perçues comme confortables et sûres.",
   },
   {
+    id: "COLD_START",
+    title: "Weilenmann, Favez & Alvarez, Atmospheric Environment 2009",
+    url: "https://doi.org/10.1016/j.atmosenv.2009.01.005",
+    note: "Surconsommation et surémissions au démarrage à froid d'un véhicule essence: ~+30 % carburant et environ x7 PM échappement durant l'amorçage du catalyseur (60-90 s).",
+  },
+  {
     id: "BRAKE",
     title: "Xu et al., Journal of Hazardous Materials, 2022",
     url: "https://pubmed.ncbi.nlm.nih.gov/35413517/",
@@ -425,6 +431,7 @@ const DEFAULTS = {
   speedB: 50,
   latAccel: 1.47,
   longAccel: 1.5,
+  coldStart: 60,
 };
 
 const CONSTANTS = {
@@ -533,6 +540,7 @@ const LEDGER = [
   ["Véhicule BMW X5 4.8is", "m=2275 kg; Cd=0,38; A=2,74 m2; Crr=0,009; cyl. 4,8 L", ["X5_SPEC", "NHTSA", "NAP15"]],
   ["Véhicule Dodge Ram 1500", "m=2366 kg; Cd=0,53; A=3,31 m2; Crr=0,009; cyl. 5,7 L", ["RAM_SPEC", "RAM_AREA", "NHTSA", "NAP15"]],
   ["Carburant moteur", "Carburant = (E_roue / 0,85 / 0,40) / PCI + 0,21 g/s/L cylindrée x t_DFCO_off", ["WILLANS", "EPA_DRIVELINE", "IDLE_FUEL", "NAP15", "DOE"]],
+  ["Démarrage à froid", "Budget +30 % carburant et x7 PM échappement appliqué pro rata sur les premières coldStart secondes; curseur dans Avancé, désactivable à 0", ["EMEP_EXHAUST", "COLD_START"]],
   ["Air et gravité", "rho(h) = 1,225 (1 - 2,2557e-5 h)^4,2559 kg/m3; g = 9,80665 m/s2", ["ISA", "ISA_DENSITY"]],
   ["Essence", "PCI = 31,82 MJ/L, dérivé de 112114-116090 Btu/gal", ["DOE"]],
   ["Prix essence Super U", "SP95-E10 = 1,989 €/L; flux consulté le 06/05/2026, dernier relevé station du 25/03/2026 09:38", ["FUELPRICE", "SUPERU"]],
@@ -554,6 +562,7 @@ document.addEventListener("DOMContentLoaded", () => {
     "speedB",
     "latAccel",
     "longAccel",
+    "coldStart",
   ].forEach((id) => {
     els[id] = document.getElementById(id);
     els[`${id}Out`] = document.getElementById(`${id}Out`);
@@ -625,6 +634,7 @@ function syncOutputs() {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })} m/s2`;
+  document.getElementById("coldStartOut").textContent = `${fr.format(state.coldStart)} s`;
 }
 
 function getParams() {
@@ -639,6 +649,7 @@ function getParams() {
     maxPowerW: vehicle.maxPowerW,
     latAccel: state.latAccel,
     longAccel: state.longAccel,
+    coldStartSeconds: state.coldStart,
   };
 }
 
@@ -934,7 +945,6 @@ function simulate(targetKmh, params, route) {
   let rollJ = 0;
   let climbJ = 0;
   let inertiaJ = 0;
-  let decelJ = 0;
   let timeS = 0;
   // Idle fuel still flows whenever the engine is not in deceleration fuel-cut: at low
   // speed (below DFCO threshold) or when the wheels are pulling. See IDLE_FUEL.
@@ -973,7 +983,6 @@ function simulate(targetKmh, params, route) {
     rollJ += fRoll * ds;
     climbJ += Math.max(fGrade, 0) * ds;
     inertiaJ += Math.max(fInertia, 0) * ds;
-    decelJ += Math.max(-fInertia, 0) * ds;
     timeS += dt;
     if (fWheel > 0 || vAvg < kmhToMps(CONSTANTS.dfcoMinKmh)) {
       idleSecondsS += dt;
@@ -990,7 +999,14 @@ function simulate(targetKmh, params, route) {
   const tractionFuelL = tractionFuelJ / (CONSTANTS.gasolineLhvMJPerL * 1e6);
   const idleFuelG = CONSTANTS.idleFuelGPerSPerL * params.displacementL * idleSecondsS;
   const idleFuelL = idleFuelG / (CONSTANTS.gasolineDensityKgPerL * 1000);
-  const fuelL = tractionFuelL + idleFuelL;
+  const warmFuelL = tractionFuelL + idleFuelL;
+  // Cold-start budget: SI gasoline burns ~30 % more fuel and emits ~7x exhaust PM until
+  // catalyst light-off. Apply the budget pro rata to the first coldStartSeconds of the
+  // trip; setting the slider to 0 turns the budget off for warm-engine comparisons.
+  // See COLD_START.
+  const coldFraction = Math.min(1, (params.coldStartSeconds || 0) / Math.max(timeS, 1));
+  const coldStartFuelL = coldFraction * warmFuelL * 0.30;
+  const fuelL = warmFuelL + coldStartFuelL;
   const fuelCostEur = fuelL * CONSTANTS.fuelPriceEurPerL;
   const distanceKm = distanceM / 1000;
   const avgKmh = (distanceKm / (timeS / 3600));
@@ -1009,15 +1025,21 @@ function simulate(targetKmh, params, route) {
     tyreTsp * CONSTANTS.tyrePM25 +
     brakeTsp * CONSTANTS.brakePM25 +
     roadTsp * CONSTANTS.roadPM25;
-  // Tier 3 EMEP: PM échappement proportionnel à la masse de carburant brûlée. See EMEP_TIER3.
-  const fuelKg = fuelL * CONSTANTS.gasolineDensityKgPerL;
-  const exhaustPmMg = fuelKg * params.exhaustPmMgPerKgFuel;
+  // Tier 3 EMEP: PM échappement proportionnel à la masse de carburant brûlée. Warm part
+  // utilise le facteur de la norme du véhicule; la fraction démarrée à froid est
+  // pondérée par environ x7 pour reproduire les surémissions catalyseur-froid.
+  // See EMEP_TIER3, COLD_START.
+  const warmFuelKg = warmFuelL * CONSTANTS.gasolineDensityKgPerL;
+  const coldFuelKg = coldStartFuelL * CONSTANTS.gasolineDensityKgPerL;
+  const exhaustPmMg = warmFuelKg * params.exhaustPmMgPerKgFuel
+    + coldFuelKg * params.exhaustPmMgPerKgFuel * 7;
 
+  // Each segment's PM10 = energy_J x 1e-6 x brakeTspGPerMJ x brakePM10. Equivalent to
+  // (energy / total) x total but avoids the divide-by-zero guard. See HAGINO.
   const brakeTotalPm10Mg = brakeTsp * CONSTANTS.brakePM10 * 1000;
-  const brakeEnergySum = brakeBySegment.reduce((sum, row) => sum + row.energyJ, 0);
   const brakePmHotspots = brakeBySegment.map((row) => ({
     km: row.km,
-    mg: brakeEnergySum > 0 ? (row.energyJ / brakeEnergySum) * brakeTotalPm10Mg : 0,
+    mg: (row.energyJ / 1e6) * CONSTANTS.brakeTspGPerMJ * CONSTANTS.brakePM10 * 1000,
   }));
 
   return {
