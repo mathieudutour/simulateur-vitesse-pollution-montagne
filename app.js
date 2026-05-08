@@ -155,6 +155,18 @@ const SOURCES = [
     url: "https://pubmed.ncbi.nlm.nih.gov/35413517/",
     note: "Les pertes d'énergie cinétique peuvent paramétrer les variations de particules de freinage.",
   },
+  {
+    id: "HAGINO",
+    title: "Hagino, Atmospheric Environment, 2016",
+    url: "https://doi.org/10.1016/j.atmosenv.2016.02.014",
+    note: "Mesures sur banc dynamométrique: ~10 mg PM10 par MJ d'énergie dissipée aux plaquettes (calibrage TSP=10 mg/MJ utilisé ici).",
+  },
+  {
+    id: "ENGINE_BRAKE",
+    title: "Heywood, Internal Combustion Engine Fundamentals, ch. 13",
+    url: "https://www.mheducation.com/highered/product/internal-combustion-engine-fundamentals-2e-heywood/M9781260116106.html",
+    note: "Couple de freinage moteur (FMEP+pompage) approché par une force lineaire en vitesse et en cylindrée; calibré à environ 0,3 m/s2 de décélération supplémentaire pour une 1,4 L à 90 km/h.",
+  },
 ];
 
 const ROUTE = {
@@ -424,16 +436,20 @@ const CONSTANTS = {
   // Below this speed, deceleration fuel-cut (DFCO) is disabled and idle fuel still flows.
   dfcoMinKmh: 25,
   tyreTspGKm: 0.0107,
-  brakeTspGKm: 0.0142,
+  // Brake wear scales with friction-brake work (post engine-brake split). Calibrated
+  // from Hagino 2016 dynamometer data: ~10 mg PM10/MJ pad work; converted to TSP via
+  // PM10/TSP=0,98 below. See HAGINO, BRAKE.
+  brakeTspGPerMJ: 0.0102,
   roadTspGKm: 0.015,
+  // Engine-brake force F_eb = k * cylindree[L] * v[m/s]. k calibré pour donner ~0,3 m/s2
+  // de décélération supplémentaire à 25 m/s sur la 1,4 L de la Note. See ENGINE_BRAKE.
+  engineBrakeNPerLPerMps: 10,
   tyrePM10: 0.6,
   tyrePM25: 0.42,
   brakePM10: 0.98,
   brakePM25: 0.39,
   roadPM10: 0.5,
   roadPM25: 0.27,
-  pmMinKmh: 25,
-  pmReferenceKmh: 45,
   urbanSpeedKmh: 50,
   ruralSpeedKmh: 90,
 };
@@ -490,10 +506,11 @@ const LEDGER = [
   ["Prix essence Super U", "SP95-E10 = 1,989 €/L; flux consulté le 06/05/2026, dernier relevé station du 25/03/2026 09:38", ["FUELPRICE", "SUPERU"]],
   ["CO2 essence E10", "2,21 kg CO2/L SP95-E10 (ADEME Base Carbone, combustion TtW)", ["ADEME_E10"]],
   ["Pneus", "TSP = 0,0107 g/km x m/m_Note; PM10/TSP = 0,60; PM2,5/TSP = 0,42", ["EMEP", "BEDDOWS"]],
-  ["Freins", "TSP = 0,0142 g/km x m/m_Note x max(1, max_25..V(Efrein + Ecin_perdue)/(Efrein_45 + Ecin_perdue_45)); PM10/TSP = 0,98; PM2,5/TSP = 0,39", ["EMEP", "BRAKE", "BEDDOWS"]],
+  ["Freins", "TSP = 0,0102 g/MJ x energie_plaquettes (post freinage moteur); PM10/TSP = 0,98; PM2,5/TSP = 0,39", ["HAGINO", "BRAKE", "EMEP"]],
   ["Chaussée", "TSP = 0,0150 g/km x m/m_Note; PM10/TSP = 0,50; PM2,5/TSP = 0,27", ["EMEP", "BEDDOWS"]],
   ["PM échappement essence", "PM = 25 mg / kg de carburant (Tier 3 fuel-based); ajouté à PM10 total et PM2,5 total", ["EMEP_EXHAUST", "EMEP_TIER3"]],
-  ["Spatialisation freins", "Part de PM freinage proportionnelle à l'énergie dissipée localement", ["BRAKE", "EMEP"]],
+  ["Freinage moteur", "F_eb = 10 N.s/(m.L) x cylindrée x v; soustrait du freinage avant calcul des PM", ["ENGINE_BRAKE"]],
+  ["Spatialisation freins", "PM frein local proportionnelle a l'energie de plaquettes du segment (apres freinage moteur)", ["HAGINO", "BRAKE"]],
 ];
 
 const els = {};
@@ -806,7 +823,8 @@ function simulate(targetKmh, params, route) {
   const points = buildSpeedProfile(targetKmh, params, route, n);
 
   let tractionJ = 0;
-  let brakeJ = 0;
+  let brakeJ = 0;        // friction-brake (pad) work only, after engine-brake share is removed
+  let engineBrakeJ = 0;  // diagnostic: energy dissipated in the engine while coasting
   let aeroJ = 0;
   let rollJ = 0;
   let climbJ = 0;
@@ -835,8 +853,17 @@ function simulate(targetKmh, params, route) {
     const fWheel = fRoll + fAero + fGrade + fInertia;
     const dt = ds / vAvg;
 
+    // When wheels pull (fWheel > 0), engine drives the car. When wheels overrun the engine
+    // (fWheel < 0), some of the deceleration is absorbed by the engine itself (pumping +
+    // FMEP) and only the residual feeds the friction brakes. See ENGINE_BRAKE.
+    const fEngineBrake = CONSTANTS.engineBrakeNPerLPerMps * params.displacementL * vAvg;
+    const overrun = Math.max(-fWheel, 0);
+    const fEngineAbsorbed = Math.min(overrun, fEngineBrake);
+    const fFrictionBrake = overrun - fEngineAbsorbed;
+
     tractionJ += Math.max(fWheel, 0) * ds;
-    brakeJ += Math.max(-fWheel, 0) * ds;
+    brakeJ += fFrictionBrake * ds;
+    engineBrakeJ += fEngineAbsorbed * ds;
     aeroJ += fAero * ds;
     rollJ += fRoll * ds;
     climbJ += Math.max(fGrade, 0) * ds;
@@ -848,7 +875,7 @@ function simulate(targetKmh, params, route) {
     }
     brakeBySegment.push({
       km: (a.km + b.km) / 2,
-      energyJ: Math.max(-fWheel, 0) * ds,
+      energyJ: fFrictionBrake * ds,
     });
   }
 
@@ -863,10 +890,11 @@ function simulate(targetKmh, params, route) {
   const distanceKm = distanceM / 1000;
   const avgKmh = (distanceKm / (timeS / 3600));
   const massScale = params.mass / VEHICLES.note.mass;
-  const brakeDemandJ = brakeJ + decelJ;
-  const brakeEnergyMultiplier = estimateBrakeDemandMultiplier(targetKmh, params, route, brakeDemandJ);
+  // Tyre and road wear keep the EMEP/Beddows mass-scaled km factors; brake wear is now
+  // tied to the friction-brake work computed above (HAGINO), which already encodes mass,
+  // speed and grade through brakeJ.
   const tyreTsp = distanceKm * CONSTANTS.tyreTspGKm * massScale;
-  const brakeTsp = distanceKm * CONSTANTS.brakeTspGKm * massScale * brakeEnergyMultiplier;
+  const brakeTsp = (brakeJ / 1e6) * CONSTANTS.brakeTspGPerMJ;
   const roadTsp = distanceKm * CONSTANTS.roadTspGKm * massScale;
   const pm10G =
     tyreTsp * CONSTANTS.tyrePM10 +
@@ -899,6 +927,7 @@ function simulate(targetKmh, params, route) {
     co2Kg: fuelL * CONSTANTS.co2KgPerL,
     tractionKWh: tractionJ / 3.6e6,
     brakeKWh: brakeJ / 3.6e6,
+    engineBrakeKWh: engineBrakeJ / 3.6e6,
     aeroKWh: aeroJ / 3.6e6,
     rollKWh: rollJ / 3.6e6,
     climbKWh: climbJ / 3.6e6,
@@ -911,50 +940,8 @@ function simulate(targetKmh, params, route) {
     tyrePm10Mg: tyreTsp * CONSTANTS.tyrePM10 * 1000,
     brakePm10Mg: brakeTotalPm10Mg,
     roadPm10Mg: roadTsp * CONSTANTS.roadPM10 * 1000,
-    brakeEnergyMultiplier,
     brakePmHotspots,
   };
-}
-
-function estimateBrakeDemandMultiplier(targetKmh, params, route, currentDemandJ) {
-  const referenceDemandJ = estimateBrakeDemandOnly(CONSTANTS.pmReferenceKmh, params, route);
-  if (referenceDemandJ <= 1000) return 1;
-
-  let peakDemandJ = Math.max(referenceDemandJ, currentDemandJ);
-  const firstSpeed = CONSTANTS.pmMinKmh;
-  const lastSpeed = Math.max(firstSpeed, Math.ceil(targetKmh));
-
-  for (let speed = firstSpeed; speed <= lastSpeed; speed += 1) {
-    peakDemandJ = Math.max(peakDemandJ, estimateBrakeDemandOnly(speed, params, route));
-  }
-
-  return Math.max(1, peakDemandJ / referenceDemandJ);
-}
-
-function estimateBrakeDemandOnly(targetKmh, params, route) {
-  const n = 260;
-  const points = buildSpeedProfile(targetKmh, params, route, n);
-
-  let brakeJ = 0;
-  let decelJ = 0;
-  for (let i = 0; i < n; i += 1) {
-    const a = points[i];
-    const b = points[i + 1];
-    const ds = b.m - a.m;
-    const dh = b.elev - a.elev;
-    const theta = Math.atan2(dh, ds);
-    const vAvg = Math.max((a.speedMps + b.speedMps) / 2, kmhToMps(3));
-    const acc = (b.speedMps * b.speedMps - a.speedMps * a.speedMps) / (2 * ds);
-    const rho = airDensity((a.elev + b.elev) / 2);
-    const fRoll = params.crr * params.mass * CONSTANTS.g * Math.cos(theta);
-    const fAero = 0.5 * rho * params.cd * params.area * vAvg * vAvg;
-    const fGrade = params.mass * CONSTANTS.g * Math.sin(theta);
-    const fInertia = params.mass * acc;
-    brakeJ += Math.max(-(fRoll + fAero + fGrade + fInertia), 0) * ds;
-    decelJ += Math.max(-fInertia, 0) * ds;
-  }
-
-  return brakeJ + decelJ;
 }
 
 function interpolateElevation(points, km) {

@@ -21,13 +21,16 @@ Le modèle est volontairement transparent:
   dépendant de la cylindrée s'ajoute hors coupure d'injection (DFCO);
 - le coût carburant multiplie les litres simulés par le prix SP95-E10 déclaré dans le flux
   officiel prix-carburants.gouv.fr pour le Super U Passy;
-- les particules pneus, freins et chaussée utilisent les facteurs EMEP/EEA;
+- les particules pneus et chaussée utilisent les facteurs EMEP/EEA mis à l'échelle par
+  la masse; les particules de freinage proviennent directement de l'énergie de
+  plaquettes (Hagino 2016, ~10 mg PM10/MJ) après soustraction de la part dissipée par
+  le freinage moteur (proportionnel à la cylindrée et à la vitesse);
 - les PM totaux ajoutent un facteur PM échappement essence proportionnel à la masse de
   carburant brûlée (EMEP/EEA Tier 3, ~25 mg/kg de SP95-E10); PM2,5 n'est pas additionné
   au PM10 car il en est une fraction;
 - les facteurs pneus et chaussée sont mis à l'échelle par la masse du véhicule, pas réduits
   par la vitesse;
-- le freinage est modulé par une demande de freinage monotone, avec spatialisation locale
-  selon l'énergie dissipée sur les segments.
+- la spatialisation des PM freinage suit l'énergie dissipée aux plaquettes sur chaque
+  segment.
 
 Les sources et les limites sont affichées dans la section "Formules, constantes et sources".
