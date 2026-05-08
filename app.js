@@ -456,8 +456,10 @@ const CONSTANTS = {
   // Engine-brake force F_eb = k * cylindree[L] * v[m/s]. k calibré pour donner ~0,3 m/s2
   // de décélération supplémentaire à 25 m/s sur la 1,4 L de la Note. See ENGINE_BRAKE.
   engineBrakeNPerLPerMps: 10,
-  // Speed-dependent rolling resistance: Crr(v) = Crr0 (1 + (v / v_ref)^2). See MICHELIN_CRR.
-  crrSpeedRefMps: 30,
+  // Speed-dependent rolling resistance: Crr(v) = Crr0 (1 + (v / v_ref)^2). v_ref calibré
+  // pour reproduire le ratio ISO 28580 / Michelin: Crr(130 km/h) / Crr(50 km/h) ~1,10.
+  // See MICHELIN_CRR.
+  crrSpeedRefMps: 100,
   tyrePM10: 0.6,
   tyrePM25: 0.42,
   brakePM10: 0.98,
@@ -512,7 +514,7 @@ const LEDGER = [
   ["Limites de vitesse", "maxspeed OSM quand tagué; 50 km/h en ville; hypothèse 90 km/h hors ville", ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132"]],
   ["Profil de vitesse montée", "v = min(v_curseur, v_limite, v_virage); accélération bornée par min(confort, P_max x eta_dt / v - F_resist); freinage borné par confort + g sin(theta)", ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132", "CURVE", "COMFORT", "EU_POWER"]],
   ["Descente en roue libre", "au-delà de v_curseur, pas de freinage tant que v < min(v_limite, v_virage)", ["DYN", "LEGIFRANCE", "LEGIFRANCE_R4132", "CURVE", "COMFORT"]],
-  ["Bilan des forces", "F = m a + Crr(v) m g cos(theta) + 0,5 rho(h) Cd A v2 + m g sin(theta); Crr(v) = Crr0 (1 + (v/30)^2)", ["DYN", "MICHELIN_CRR"]],
+  ["Bilan des forces", "F = m a + Crr(v) m g cos(theta) + 0,5 rho(h) Cd A v2 + m g sin(theta); Crr(v) = Crr0 (1 + (v/100)^2)", ["DYN", "MICHELIN_CRR"]],
   ["Conditions aux limites", "Vitesse nulle au départ (Super U), à l'arrivée (maison médicale) et au point de retournement (aller-retour)", []],
   ["Cinématique freinage", "v2 = v0 2 + 2 a s", ["DYN", "COMFORT"]],
   ["Véhicule Nissan Note", "m=1118 kg; Cd=0,30; A=2,25 m2; Crr=0,009; cyl. 1,4 L", ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15"]],
@@ -842,12 +844,20 @@ function applyCoastingDescentProfile(capPoints, targetMps, params) {
     const previous = points[i - 1];
     const point = points[i];
     const ds = point.m - previous.m;
+    const dsForSlope = Math.max(ds, 0.1);
+    const theta = Math.atan2(point.elev - previous.elev, dsForSlope);
+    const rho = airDensity((previous.elev + point.elev) / 2);
     const freeAccel = coastingAcceleration(previous.speedMps, previous, point, params);
     const freeSpeed = Math.sqrt(Math.max(minSpeed * minSpeed, previous.speedMps * previous.speedMps + 2 * freeAccel * ds));
     let nextSpeed = freeSpeed;
 
     if (freeSpeed < targetMps) {
-      const poweredSpeed = Math.sqrt(previous.speedMps * previous.speedMps + 2 * params.longAccel * ds);
+      // Powered ramp toward the cruise target, capped by what the engine can deliver at
+      // this slope and speed. Without this cap a heavy SUV would accelerate uphill at the
+      // comfort target in round-trip mode. See EU_POWER.
+      const aPowered = poweredAccel(params, previous.speedMps, theta, rho);
+      const aEff = Math.max(0, Math.min(params.longAccel, aPowered));
+      const poweredSpeed = Math.sqrt(previous.speedMps * previous.speedMps + 2 * aEff * ds);
       nextSpeed = Math.max(freeSpeed, Math.min(targetMps, poweredSpeed));
     }
 
