@@ -132,6 +132,12 @@ const SOURCES = [
     note: "Approche Tier 3 par masse de carburant: PM échappement ~25 mg par kg d'essence brûlée pour un Euro 5 SI, calibré pour reproduire le facteur 1,4 mg/km à 56 g/km de carburant.",
   },
   {
+    id: "EMEP_EURO_TIERS",
+    title: "EMEP/EEA Guidebook 2023, gasoline LDV PM by Euro class",
+    url: "https://www.eea.europa.eu/en/analysis/publications/emep-eea-guidebook-2023/part-b-sectoral-guidance-chapters/1-energy/1-a-combustion/1-a-3-b-i/view",
+    note: "Les facteurs PM échappement essence dépendent fortement de la norme: Euro 5/6 SI ~25 mg/kg, Euro 4 / Tier 2 SI ~90 mg/kg, Euro 3 SI ~120 mg/kg.",
+  },
+  {
     id: "EMEP",
     title: "EMEP/EEA Guidebook 2023, tyre and brake wear, update 2025",
     url: "https://www.eea.europa.eu/en/analysis/publications/emep-eea-guidebook-2023/part-b-sectoral-guidance-chapters/1-energy/1-a-combustion/1-a-3-b-vi",
@@ -434,8 +440,8 @@ const CONSTANTS = {
   // l'essence pure et surestime ~6 % le CO2 par litre de E10. See ADEME_E10.
   co2KgPerL: 2.21,
   // Tier 3 EMEP par masse de carburant: les émissions PM échappement suivent le
-  // débit de carburant plutôt que la distance. See EMEP_TIER3.
-  exhaustPmMgPerKgFuel: 25,
+  // débit de carburant plutôt que la distance. Le facteur exact dépend de la norme et
+  // est porté par chaque profil véhicule. See EMEP_TIER3, EMEP_EURO_TIERS.
   // Willans-line: traction part of fuel = (P_wheel / eta_dt) / eta_indicated.
   // eta_brake ~22 % (NAP15) emerges from eta_indicated x mech / (mech + idle), so the
   // legacy flat-22 % value is preserved at the calibration point but degrades at low
@@ -480,7 +486,9 @@ const VEHICLES = {
     crr: 0.009,
     displacementL: 1.4,
     maxPowerW: 65000,
-    sources: ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15", "WILLANS", "EPA_DRIVELINE", "EU_POWER", "PHOTO_NOTE"],
+    euroTier: "Euro 5",
+    exhaustPmMgPerKgFuel: 25,
+    sources: ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15", "WILLANS", "EPA_DRIVELINE", "EU_POWER", "EMEP_EURO_TIERS", "PHOTO_NOTE"],
   },
   suv: {
     label: "BMW X5 4.8is",
@@ -491,7 +499,9 @@ const VEHICLES = {
     crr: 0.009,
     displacementL: 4.8,
     maxPowerW: 268000,
-    sources: ["X5_SPEC", "NHTSA", "NAP15", "WILLANS", "EPA_DRIVELINE", "EU_POWER", "PHOTO_X5"],
+    euroTier: "Euro 3",
+    exhaustPmMgPerKgFuel: 120,
+    sources: ["X5_SPEC", "NHTSA", "NAP15", "WILLANS", "EPA_DRIVELINE", "EU_POWER", "EMEP_EURO_TIERS", "PHOTO_X5"],
   },
   pickup: {
     label: "Dodge Ram 1500",
@@ -502,7 +512,9 @@ const VEHICLES = {
     crr: 0.009,
     displacementL: 5.7,
     maxPowerW: 254000,
-    sources: ["RAM_SPEC", "RAM_AREA", "NHTSA", "NAP15", "WILLANS", "EPA_DRIVELINE", "EU_POWER", "PHOTO_RAM"],
+    euroTier: "Tier 2 Bin 5",
+    exhaustPmMgPerKgFuel: 90,
+    sources: ["RAM_SPEC", "RAM_AREA", "NHTSA", "NAP15", "WILLANS", "EPA_DRIVELINE", "EU_POWER", "EMEP_EURO_TIERS", "PHOTO_RAM"],
   },
 };
 
@@ -510,7 +522,7 @@ const LEDGER = [
   ["Points de départ et arrivée", "Super U Passy -> Maison médicale du Plateau d'Assy", ["SUPERU", "MED"]],
   ["Distance routière", "10,2351 km, géométrie OSM D39 / D43 / D13 / D43", ["OSM"]],
   ["Altitudes", "45 points EU-DEM 25 m, 578,1 à 1038,7 m", ["OTD"]],
-  ["Virages", "Rayons déduits de la géométrie OSM; v = sqrt(a_lateral x R)", ["OSM", "CURVE"]],
+  ["Virages", "Rayons déduits de la géométrie OSM; v = sqrt(a_lateral x R); cap maintenu sur la longueur d'arc R x angle", ["OSM", "CURVE"]],
   ["Limites de vitesse", "maxspeed OSM quand tagué; 50 km/h en ville; hypothèse 90 km/h hors ville", ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132"]],
   ["Profil de vitesse montée", "v = min(v_curseur, v_limite, v_virage); accélération bornée par min(confort, P_max x eta_dt / v - F_resist); freinage borné par confort + g sin(theta)", ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132", "CURVE", "COMFORT", "EU_POWER"]],
   ["Descente en roue libre", "au-delà de v_curseur, pas de freinage tant que v < min(v_limite, v_virage)", ["DYN", "LEGIFRANCE", "LEGIFRANCE_R4132", "CURVE", "COMFORT"]],
@@ -528,7 +540,7 @@ const LEDGER = [
   ["Pneus", "TSP = 0,0107 g/km x m/m_Note; PM10/TSP = 0,60; PM2,5/TSP = 0,42", ["EMEP", "BEDDOWS"]],
   ["Freins", "TSP = 0,0102 g/MJ x energie_plaquettes (post freinage moteur); PM10/TSP = 0,98; PM2,5/TSP = 0,39", ["HAGINO", "BRAKE", "EMEP"]],
   ["Chaussée", "TSP = 0,0150 g/km x m/m_Note; PM10/TSP = 0,50; PM2,5/TSP = 0,27", ["EMEP", "BEDDOWS"]],
-  ["PM échappement essence", "PM = 25 mg / kg de carburant (Tier 3 fuel-based); ajouté à PM10 total et PM2,5 total", ["EMEP_EXHAUST", "EMEP_TIER3"]],
+  ["PM échappement essence", "PM = facteur véhicule x masse de carburant; 25 mg/kg (Note Euro 5), 90 mg/kg (Ram Tier 2), 120 mg/kg (X5 Euro 3); ajouté à PM10 total et PM2,5 total", ["EMEP_EXHAUST", "EMEP_TIER3", "EMEP_EURO_TIERS"]],
   ["Freinage moteur", "F_eb = 10 N.s/(m.L) x cylindrée x v; soustrait du freinage avant calcul des PM", ["ENGINE_BRAKE"]],
   ["Spatialisation freins", "PM frein local proportionnelle a l'energie de plaquettes du segment (apres freinage moteur)", ["HAGINO", "BRAKE"]],
 ];
@@ -623,6 +635,7 @@ function getParams() {
     area: vehicle.area,
     crr: vehicle.crr,
     displacementL: vehicle.displacementL,
+    exhaustPmMgPerKgFuel: vehicle.exhaustPmMgPerKgFuel,
     maxPowerW: vehicle.maxPowerW,
     latAccel: state.latAccel,
     longAccel: state.longAccel,
@@ -641,6 +654,7 @@ function initVehicleTooltips() {
       ["Crr", fmt(vehicle.crr, 3, "")],
       ["Cylindrée", fmt(vehicle.displacementL, 1, " L")],
       ["Puissance", fmt(vehicle.maxPowerW / 1000, 0, " kW")],
+      ["Norme", `${vehicle.euroTier} (${fmt(vehicle.exhaustPmMgPerKgFuel, 0, " mg PM/kg")})`],
       ["Sources", vehicle.sources.join(" / ")],
     ];
     const tooltipId = `vehicle-tooltip-${button.dataset.vehicle}`;
@@ -763,16 +777,25 @@ function buildSpeedProfile(targetKmh, params, route, n) {
         curveSpeedLimitMps,
         Math.sqrt(params.latAccel * curve.radiusM),
       );
-      // Approach lookahead only; departure (m > curveM) is handled by the forward pass
-      // with engine-power-limited acceleration. Effective decel is gravity-aided uphill
-      // and gravity-opposed downhill; clamp >= 0.5 m/s2 so very steep slopes still allow
-      // a stop. See COMFORT.
-      if (m >= curveM) return;
+      // The curve-cap holds across the full arc length R x angle, not just at the apex,
+      // so a fast vehicle cannot exceed it while still inside the bend. See CURVE.
+      const arcLengthM = curve.radiusM * Math.abs(curve.angleDeg) * (Math.PI / 180);
+      const halfArcM = arcLengthM / 2;
+      if (m >= curveM - halfArcM && m <= curveM + halfArcM) {
+        speedMps = Math.min(speedMps, curveCap);
+        return;
+      }
+      // Approach lookahead before the curve; departure (after curveM + halfArc) is handled
+      // by the forward pass with engine-power-limited acceleration. Effective decel is
+      // gravity-aided uphill and gravity-opposed downhill; clamp >= 0.5 m/s2 so very
+      // steep slopes still allow a stop. See COMFORT.
+      if (m > curveM) return;
+      const approachStartM = curveM - halfArcM;
       const elevHere = interpolateElevation(route.points, km);
       const elevCurve = interpolateElevation(route.points, curve.km);
-      const slopeTheta = Math.atan2(elevCurve - elevHere, Math.max(curveM - m, 0.1));
+      const slopeTheta = Math.atan2(elevCurve - elevHere, Math.max(approachStartM - m, 0.1));
       const decel = Math.max(0.5, params.longAccel + CONSTANTS.g * Math.sin(slopeTheta));
-      const approachLimit = Math.sqrt(curveCap * curveCap + 2 * decel * (curveM - m));
+      const approachLimit = Math.sqrt(curveCap * curveCap + 2 * decel * (approachStartM - m));
       speedMps = Math.min(speedMps, approachLimit);
     });
 
@@ -988,7 +1011,7 @@ function simulate(targetKmh, params, route) {
     roadTsp * CONSTANTS.roadPM25;
   // Tier 3 EMEP: PM échappement proportionnel à la masse de carburant brûlée. See EMEP_TIER3.
   const fuelKg = fuelL * CONSTANTS.gasolineDensityKgPerL;
-  const exhaustPmMg = fuelKg * CONSTANTS.exhaustPmMgPerKgFuel;
+  const exhaustPmMg = fuelKg * params.exhaustPmMgPerKgFuel;
 
   const brakeTotalPm10Mg = brakeTsp * CONSTANTS.brakePM10 * 1000;
   const brakeEnergySum = brakeBySegment.reduce((sum, row) => sum + row.energyJ, 0);
