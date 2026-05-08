@@ -1025,14 +1025,14 @@ function simulate(targetKmh, params, route) {
     tyreTsp * CONSTANTS.tyrePM25 +
     brakeTsp * CONSTANTS.brakePM25 +
     roadTsp * CONSTANTS.roadPM25;
-  // Tier 3 EMEP: PM échappement proportionnel à la masse de carburant brûlée. Warm part
-  // utilise le facteur de la norme du véhicule; la fraction démarrée à froid est
-  // pondérée par environ x7 pour reproduire les surémissions catalyseur-froid.
-  // See EMEP_TIER3, COLD_START.
+  // Tier 3 EMEP: PM échappement proportionnel à la masse de carburant brûlée. Pendant
+  // la fenêtre démarrage à froid, le catalyseur n'est pas amorcé, donc *toute* la fuel
+  // brûlée durant ces secondes (baseline + surconsommation +30 %) émet ~7x plus de PM.
+  // Ne pondérer que la surconsommation par 7x (le bug initial) sous-évaluerait le total
+  // de ~20 %. See EMEP_TIER3, COLD_START.
   const warmFuelKg = warmFuelL * CONSTANTS.gasolineDensityKgPerL;
-  const coldFuelKg = coldStartFuelL * CONSTANTS.gasolineDensityKgPerL;
-  const exhaustPmMg = warmFuelKg * params.exhaustPmMgPerKgFuel
-    + coldFuelKg * params.exhaustPmMgPerKgFuel * 7;
+  const coldMultiplier = (1 - coldFraction) + coldFraction * 1.30 * 7;
+  const exhaustPmMg = warmFuelKg * params.exhaustPmMgPerKgFuel * coldMultiplier;
 
   // Each segment's PM10 = energy_J x 1e-6 x brakeTspGPerMJ x brakePM10. Equivalent to
   // (energy / total) x total but avoids the divide-by-zero guard. See HAGINO.
