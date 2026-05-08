@@ -1,0 +1,384 @@
+% Draft paper. Written in English (more publishable than French for a transport
+% / environmental-emissions venue); the validation protocol it references is in
+% French in validation-experimentale.md.
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{siunitx}
+\usepackage{hyperref}
+\usepackage{authblk}
+\usepackage{caption}
+
+\title{Cruise speed versus vehicle class on a short, steep mountain road:\\
+a transparent fuel and particulate-emission simulator\\
+with paired field validation}
+
+\author[1]{M.~Dutour}
+\affil[1]{Independent --- \texttt{simulateur-vitesse-pollution-montagne}, Plateau d'Assy, France}
+
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We describe a fully transparent, browser-side simulator that estimates
+fuel consumption, \ce{CO2}, exhaust and non-exhaust particulate matter
+for an internal-combustion-engine vehicle traversing the Super~U~Passy
+$\leftrightarrow$ Maison m\'edicale du Plateau d'Assy mountain road
+(\SI{10.235}{km} one-way, \SI{460}{m} elevation change). The model
+combines an OSM-derived geometry, a kinematic speed profile bounded by
+posted limits, curve geometry and engine power, a Willans-line fuel
+model with idle and driveline losses, EMEP/EEA non-exhaust factors
+scaled by mass, and a kinetic-energy-based brake-PM model after the
+engine-braking share is removed. Every coefficient is sourced and
+exposed in the user interface. We propose a paired within-subject
+field campaign that targets the \emph{difference} between two cruise
+speeds rather than absolute values, designed so the simulator can be
+falsified or accepted as a comparison tool even in the presence of
+moderate absolute bias. Pre-registered effect sizes and acceptance
+intervals are given. Implications for advisory speed signage on short,
+steep roads are discussed.
+\end{abstract}
+
+\section{Introduction}
+
+Air-quality policy on small mountain roads typically inherits speed
+limits and emission assumptions from urban or motorway contexts. Yet
+short, steep links exhibit two effects that make those assumptions
+unreliable: the fraction of total trip energy spent climbing is large,
+so any aero-versus-gravity speed-sensitivity intuition flips; and a
+non-trivial share of the kilometer-averaged particulate emission
+comes from non-exhaust sources, whose dependence on speed is itself
+contested~\cite{beddows2021,emep2023ldv}.
+
+We present a simulator built specifically for a single
+\SI{10.235}{km} road on the Plateau d'Assy massif in the Haute-Savoie
+prealps. The choice is deliberate: the road carries daily medical
+traffic, has a posted limit that varies between \SI{30}{km/h} and
+\SI{90}{km/h}, climbs \SI{460}{m} over its length, and includes
+nineteen curves with radii as small as \SI{25}{m}. Public discussion
+about an advisory speed limit on this link motivated the work.
+
+The simulator is deliberately scoped so that:
+
+\begin{enumerate}
+  \item every coefficient is traceable to a public source visible
+        in the user interface;
+  \item the code is short (\textasciitilde\num{1700} lines, no
+        dependencies, runs entirely in the browser);
+  \item the user controls all relevant degrees of freedom (cruise
+        speed, vehicle profile, comfort acceleration, cold-start
+        budget, direction, round trip);
+  \item the output that matters --- the \emph{difference} between
+        two scenarios --- is presented as the primary metric.
+\end{enumerate}
+
+This paper documents the model, sketches a paired field-validation
+campaign aimed at the comparison axis, and lays out the
+pre-registered statistical machinery for accepting or falsifying it.
+
+\section{Route and study site}
+
+The route follows D~39, D~43 and D~13 between the Super~U Passy
+gas station (\ang{45;55;9.2} N, \ang{6;42;16.1} E, \SI{578}{m}) and
+the Maison m\'edicale du Plateau d'Assy (\ang{45;56;22.1} N,
+\ang{6;42;26.8} E, \SI{1039}{m}). Geometry is taken from
+OpenStreetMap; elevations from the European EU-DEM at \SI{25}{m}
+spacing; \texttt{maxspeed} tags are used where present, with
+fallbacks of \SI{50}{km/h} (urban) and \SI{90}{km/h} (rural)
+otherwise. The route includes nineteen labelled curves whose radii
+were estimated from the OSM polyline.
+
+\section{Model}
+
+The simulator builds a position-discretised speed profile
+$v(s)$ on $s \in [0, L]$ with $L$ the route length (one-way or doubled
+for round trip), then integrates a longitudinal force balance
+\cite{liu2017} along $s$ to obtain energy and emission totals.
+
+\subsection{Speed profile}
+
+For each station~$s$ the local speed cap is
+
+\begin{equation}
+v_{\text{cap}}(s) = \min\!\left( v_{\text{cruise}},\, v_{\text{lim}}(s),\,
+  \min_{c \in \mathcal{C}} v_{\text{curve}}(s, c) \right),
+\end{equation}
+
+where $v_{\text{lim}}$ is the posted limit and $v_{\text{curve}}(s,c)
+= \sqrt{a_{\text{lat}} R_c}$ for curve $c$ of radius $R_c$. The curve
+cap holds across the full arc length $R_c \, \theta_c$, not only at
+the apex. A parabolic approach lookahead with
+$a_{\text{decel}} = a_{\text{comfort}} + g \sin\theta(s)$ ensures the
+deceleration is consistent with the slope.
+
+A forward pass clamps acceleration by both the comfort target and the
+engine power available at the local slope and speed. We use the
+canonical constant-torque-below-base-speed / constant-power-above
+form~\cite{heywood2018}:
+
+\begin{equation}
+F_{\text{avail}}(v, h) = \frac{P_{\max} \,\eta_{\text{dt}} \, \rho(h)/\rho_0}
+                              {\max(v_{P_{\max}}, v)}.
+\end{equation}
+
+Air density follows the ISA troposphere
+$\rho(h) = \rho_0 (1 - L_h h)^{4.2559}$ with $L_h =
+\SI{2.2557e-5}{m^{-1}}$. The trip starts and ends at rest, and a round
+trip pauses at the turnaround.
+
+\subsection{Longitudinal dynamics}
+
+For each segment $[s_a, s_b]$ we compute
+
+\begin{align}
+F_{\text{roll}} &= C_{\text{rr}}(\langle v^2 \rangle) \, m g \cos\theta, \\
+F_{\text{aero}} &= \tfrac{1}{2} \rho(h) C_d A \,\langle v^2 \rangle, \\
+F_{\text{grade}} &= m g \sin\theta, \\
+F_{\text{inertia}} &= m \, \frac{v_b^2 - v_a^2}{2(s_b - s_a)},
+\end{align}
+
+with $\langle v^2 \rangle = (v_a^2 + v_b^2)/2$ being the spatial mean
+of $v^2$ for constant-acceleration kinematics --- the trapezoidal
+approximation $\bar{v}^2$ is biased by Jensen's inequality on launch
+and stop segments. Rolling resistance follows
+$C_{\text{rr}}(v) = C_{\text{rr},0} (1 + (v / v_{\text{rr}})^2)$ with
+$v_{\text{rr}} = \SI{100}{m/s}$, calibrated to the ISO~28580 ratio
+$C_{\text{rr}}(\SI{130}{km/h}) / C_{\text{rr}}(\SI{50}{km/h}) \approx
+1.10$.
+
+\subsection{Fuel and \texorpdfstring{\ce{CO2}}{CO2}}
+
+Fuel follows a Willans line~\cite{guzzella2013}
+
+\begin{equation}
+\dot m_{\text{fuel}} =
+\frac{P_{\text{wheel}}}{\eta_{\text{dt}} \, \eta_{\text{ind}} \, h_u}
++ k_{\text{idle}} \, V_d \, \mathbb{1}[\text{not in DFCO}],
+\end{equation}
+
+with $\eta_{\text{ind}} = 0.40$, $\eta_{\text{dt}} = 0.85$, $k_{\text{idle}}
+= \SI{0.21}{g.s^{-1}.L^{-1}}$ of displacement, and DFCO disengaged
+below \SI{25}{km/h}. \ce{CO2} uses the ADEME~Base~Carbone E10
+combustion factor of \SI{2.21}{kg/L}~\cite{ademe2023}.
+
+A cold-start window of $T_{\text{cs}}$ seconds (default \SI{60}{s},
+user-controlled) applies a $+30\,\%$ fuel surcharge and a
+$\times 7$ catalyst-light-off PM penalty to the fraction of fuel
+burned during the first $T_{\text{cs}}$ seconds (doubled for round
+trips since the engine cools at the turnaround), per Weilenmann
+\textit{et al.}~\cite{weilenmann2009}.
+
+\subsection{Tailpipe PM}
+
+Tailpipe PM follows the EMEP/EEA Tier~3 fuel-mass approach: total PM
+is the fuel mass burned multiplied by a per-vehicle factor that
+depends on the emissions tier (Note Euro~5: \SI{25}{mg/kg}; Ram
+Tier~2 Bin~5: \SI{90}{mg/kg}; X5~Euro~3: \SI{120}{mg/kg})
+\cite{emep2023si}.
+
+\subsection{Non-exhaust PM}
+
+Tyre and road wear use EMEP/EEA TSP factors of \SI{0.0107}{g/km} and
+\SI{0.015}{g/km} respectively, scaled linearly by vehicle mass per
+Beddows and Harrison~\cite{beddows2021}. Brake wear uses an
+energy-based model: pad work is multiplied by \SI{0.0102}{g.MJ^{-1}}
+of TSP, calibrated against the Hagino dynamometer
+data~\cite{hagino2016}, and the engine-braking share
+$F_{\text{eb}} = k_{\text{eb}} V_d v$ is removed before charging the
+residual to the friction brakes. PM10 and PM2.5 fractions follow
+EMEP~\cite{emep2023nonexhaust}.
+
+\subsection{Diagnostics}
+
+Two quantities not present in standard EMEP rollups are surfaced:
+
+\begin{itemize}
+  \item the \emph{power-limited distance} where
+        $a_{\text{powered}}(v, \theta, \rho) < 0$, indicating
+        segments where the engine cannot maintain speed at the
+        local slope --- a check on the heavy-vehicle, steep-grade
+        regime;
+  \item per-segment brake-wear hotspots, derived from the same
+        per-MJ factor as the trip total, used to colour the speed
+        profile chart.
+\end{itemize}
+
+\section{Validation experiment}
+
+The model is intended for relative comparisons between cruise speeds.
+We pre-register hypotheses on the \emph{difference} between
+\SI{50}{km/h} and \SI{90}{km/h} round trips (Sec.~\ref{sec:hypotheses})
+and design a paired within-subject campaign whose statistical power
+is dominated by between-trip noise rather than absolute model bias.
+Full protocol in
+\href{https://github.com/mathieudutour/simulateur-vitesse-pollution-montagne/blob/main/validation-experimentale.md}{\texttt{validation-experimentale.md}}.
+
+\subsection{Pre-registered hypotheses}\label{sec:hypotheses}
+
+\begin{description}
+  \item[H1.] $\Delta_{\text{fuel}} = X_{90} - X_{50}$ on a round trip
+        is positive, in $[+0.15, +0.40]$~L for the Note,
+        $[+0.30, +0.80]$~L for the heavier profiles.
+  \item[H2.] $\Delta_{\text{time}}$ is negative, in $[-9, -5]$~min,
+        vehicle-independent.
+  \item[H3.] $\Delta_{E_{\text{brake}}}$ is positive; the ratio
+        $\Delta_{E_{\text{brake}}}^{\text{SUV}} /
+         \Delta_{E_{\text{brake}}}^{\text{Note}} > 1.5$.
+  \item[H4.] Power-limited distance is zero for the Note at
+        \SI{50}{km/h}, and strictly positive for the pickup at
+        \SI{90}{km/h} on the climb.
+\end{description}
+
+\subsection{Design and analysis}
+
+We run $N=6$ paired round trips per (vehicle, cruise speed) cell
+across two days separated by a week, in a Latin-square-randomised
+order. Fuel is measured by tank-full to tank-full at the same pump.
+Time and instantaneous speed come from a \SI{1}{Hz} GPS log. Brake
+energy is proxied by IR brake-disc temperature change. PM is measured
+only if a portable PEMS is available; the rest of the campaign holds
+without it.
+
+For every cell we form pairs $(\Delta_{\text{meas},i},
+\Delta_{\text{sim},i})$ and run (a) a sign test on
+$\Delta_{\text{meas}} - \Delta_{\text{sim}}$, (b) a paired
+log-ratio test, and (c) a paired regression
+$\Delta_{\text{meas}} = \alpha + \beta \Delta_{\text{sim}} +
+\varepsilon$. Acceptance criterion: $\beta \in [0.7, 1.4]$, $\alpha$
+indistinguishable from~$0$ at \SI{90}{\percent}, sign-test consistent.
+A 90~\% confidence interval is computed by paired bootstrap rather
+than Student.
+
+\section{Results}\label{sec:results}
+
+Empirical results from the campaign will be inserted here. The
+expected qualitative shape is shown schematically in
+Fig.~\ref{fig:expected}. Three observations should hold if the model
+is to be useful as a public-facing tool:
+
+\begin{enumerate}
+  \item For the Note, fuel difference between \SI{50}{km/h} and
+        \SI{90}{km/h} on the round trip is dominated by aero on the
+        descent (where the slider acts as a soft cap) rather than
+        traction on the climb (where engine power binds). The
+        simulator should reproduce this asymmetry --- climb fuel is
+        relatively insensitive to cruise choice.
+  \item Brake energy and brake-PM differences scale super-linearly
+        with mass for the same cruise-speed delta: more KE to
+        dissipate when entering each curve.
+  \item The cold-start budget reshapes the cross-vehicle PM ranking
+        on the round trip. Without it, the EMEP fuel-mass factor
+        dominates; with it, an Euro~3 SUV that cold-starts twice
+        moves clearly ahead of an Euro~5 small car.
+\end{enumerate}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.7\linewidth]{example-image-a}
+  \caption{Schematic: predicted $\Delta$(fuel, time, brake~PM) between
+  \SI{50}{km/h} and \SI{90}{km/h} round trips, by vehicle profile.
+  Replace with measured data after the field campaign.}
+  \label{fig:expected}
+\end{figure}
+
+\section{Discussion}
+
+The paired design intentionally trades absolute accuracy for
+comparison robustness. A simulator that is, say, \SI{15}{\percent}
+optimistic on absolute fuel can still be a credible comparison tool
+provided its \emph{deltas} match measurement to within sampling
+noise. The validation protocol is built around this trade-off.
+
+Three limits deserve emphasis. First, the model has a single fixed
+gear and uses a linear-in-vehicle-speed engine-braking term; downhill
+descents in low gear are not represented and may show systematically
+high friction-brake PM. Second, particle number (PN) is not modelled,
+so direct-injection gasoline regulatory compliance cannot be inferred
+from the output. Third, the cold-start budget is uniform in time,
+whereas the real catalyst light-off curve is exponential; the total
+penalty is correctly captured but the spatial distribution along the
+route is not.
+
+\section{Conclusion}
+
+The simulator is, by construction, easier to falsify on relative
+than on absolute terms; the protocol in
+\href{https://github.com/mathieudutour/simulateur-vitesse-pollution-montagne/blob/main/validation-experimentale.md}{\texttt{validation-experimentale.md}}
+is sized to do exactly that for the three vehicle profiles already in
+the tool. If the paired comparisons hold, the simulator can be used to
+inform advisory speed discussions on the Plateau d'Assy road, with
+honest acknowledgement of the absolute-value uncertainty. If they do
+not, the discrepancies will localise --- per-vehicle, per-direction,
+per-quantity --- which coefficient or sub-model needs revision.
+
+\paragraph{Reproducibility.} Code, route data and constants are
+available at\\
+\url{https://github.com/mathieudutour/simulateur-vitesse-pollution-montagne}.
+The branch \texttt{claude/review-model-flaws-f6U7f} contains the model
+described in this paper.
+
+\paragraph{Acknowledgements.} OpenStreetMap and the EEA EU-DEM project
+provide the route geometry and elevations.
+
+\bibliographystyle{plain}
+\begin{thebibliography}{99}
+
+\bibitem{liu2017}
+F.~Liu and Z.~Li, \emph{Modeling longitudinal vehicle dynamics on
+graded roads}, Energies, vol.~10, no.~5, p.~700, 2017.
+
+\bibitem{heywood2018}
+J.~B. Heywood, \emph{Internal Combustion Engine Fundamentals},
+2nd~ed., McGraw-Hill, 2018.
+
+\bibitem{guzzella2013}
+L.~Guzzella and A.~Sciarretta, \emph{Vehicle Propulsion Systems:
+Introduction to Modeling and Optimization}, 3rd~ed., Springer, 2013.
+
+\bibitem{ademe2023}
+ADEME, \emph{Base Carbone, facteurs d'\'emission combustion SP95-E10},
+2023, \url{https://base-carbone.ademe.fr/}.
+
+\bibitem{weilenmann2009}
+M.~Weilenmann, J.-Y. Favez, R.~Alvarez,
+\emph{Cold-start emissions of modern passenger cars at different
+low-ambient temperatures and their evolution over vehicle legislation
+categories}, Atmospheric Environment, vol.~43, no.~15, pp.~2419--2429,
+2009.
+
+\bibitem{emep2023ldv}
+European Environment Agency, \emph{EMEP/EEA Air Pollutant Emission
+Inventory Guidebook 2023, Part B 1.A.3.b: Road transport},
+\url{https://www.eea.europa.eu/publications/emep-eea-guidebook-2023}.
+
+\bibitem{emep2023si}
+European Environment Agency, \emph{EMEP/EEA Guidebook 2023, gasoline
+LDV PM emission factors by Euro class}, 2023.
+
+\bibitem{emep2023nonexhaust}
+European Environment Agency, \emph{EMEP/EEA Guidebook 2023, tyre,
+brake and road wear (1.A.3.b.vi)}, update 2025.
+
+\bibitem{beddows2021}
+D.~Beddows and R.~M. Harrison, \emph{PM\textsubscript{10} and
+PM\textsubscript{2.5} emission factors for non-exhaust particles
+from road vehicles}, Atmospheric Environment, vol.~244, p.~117886,
+2021.
+
+\bibitem{hagino2016}
+H.~Hagino, \emph{Laboratory testing of airborne brake-wear particle
+emissions using a dynamometer system under urban city driving cycles
+and vehicle braking maneuvers}, Atmospheric Environment, vol.~131,
+pp.~269--278, 2016.
+
+\end{thebibliography}
+
+\end{document}
