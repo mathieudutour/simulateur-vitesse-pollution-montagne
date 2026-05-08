@@ -72,6 +72,12 @@ const SOURCES = [
     note: "Densité de l'air au niveau mer et accélération standard de la pesanteur.",
   },
   {
+    id: "ISA_DENSITY",
+    title: "ICAO Standard Atmosphere, barometric form",
+    url: "https://www.icao.int/environmental-protection/Documents/Publications/Doc%207488.pdf",
+    note: "Forme troposphérique rho(h) = rho0 (1 - L h)^4,2559 utilisée pour corriger la densité de l'air aux altitudes 578-1039 m du parcours.",
+  },
+  {
     id: "NAP15",
     title: "National Academies, SI gasoline engines, 2015",
     url: "https://www.nationalacademies.org/read/21744/chapter/4",
@@ -363,7 +369,10 @@ const DEFAULTS = {
 
 const CONSTANTS = {
   g: 9.80665,
-  rho: 1.225,
+  // ISA troposphere: rho(h) = rho0 (1 - L h)^4,2559. See ISA, ISA_DENSITY.
+  rho0: 1.225,
+  isaLapse: 2.2557e-5,
+  isaExp: 4.2559,
   gasolineLhvMJPerL: 31.82,
   fuelPriceEurPerL: 1.989,
   co2KgPerL: 8.887 / 3.785411784,
@@ -429,7 +438,7 @@ const LEDGER = [
   ["Véhicule Nissan Note", "m=1118 kg; Cd=0,30; A=2,25 m2; Crr=0,009; eta=22 %", ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15"]],
   ["Véhicule BMW X5 4.8is", "m=2275 kg; Cd=0,38; A=2,74 m2; Crr=0,009; eta=22 %", ["X5_SPEC", "NHTSA", "NAP15"]],
   ["Véhicule Dodge Ram 1500", "m=2366 kg; Cd=0,53; A=3,31 m2; Crr=0,009; eta=22 %", ["RAM_SPEC", "RAM_AREA", "NHTSA", "NAP15"]],
-  ["Air et gravité", "rho = 1,225 kg/m3; g = 9,80665 m/s2", ["ISA"]],
+  ["Air et gravité", "rho(h) = 1,225 (1 - 2,2557e-5 h)^4,2559 kg/m3; g = 9,80665 m/s2", ["ISA", "ISA_DENSITY"]],
   ["Essence", "PCI = 31,82 MJ/L, dérivé de 112114-116090 Btu/gal", ["DOE"]],
   ["Prix essence Super U", "SP95-E10 = 1,989 €/L; flux consulté le 06/05/2026, dernier relevé station du 25/03/2026 09:38", ["FUELPRICE", "SUPERU"]],
   ["CO2 essence", "8887 g CO2/gal = 2,35 kg CO2/L", ["EPA"]],
@@ -730,8 +739,9 @@ function coastingAcceleration(speedMps, a, b, params) {
   const dh = b.elev - a.elev;
   const theta = Math.atan2(dh, ds);
   const speed = Math.max(speedMps, kmhToMps(3));
+  const rho = airDensity((a.elev + b.elev) / 2);
   const fRoll = params.crr * params.mass * CONSTANTS.g * Math.cos(theta);
-  const fAero = 0.5 * CONSTANTS.rho * params.cd * params.area * speed * speed;
+  const fAero = 0.5 * rho * params.cd * params.area * speed * speed;
   const fGrade = params.mass * CONSTANTS.g * Math.sin(theta);
   return -(fRoll + fAero + fGrade) / params.mass;
 }
@@ -767,8 +777,9 @@ function simulate(targetKmh, params, route) {
     const vAvg = Math.max((a.speedMps + b.speedMps) / 2, kmhToMps(3));
     const acc = (b.speedMps * b.speedMps - a.speedMps * a.speedMps) / (2 * ds);
 
+    const rho = airDensity((a.elev + b.elev) / 2);
     const fRoll = params.crr * params.mass * CONSTANTS.g * Math.cos(theta);
-    const fAero = 0.5 * CONSTANTS.rho * params.cd * params.area * vAvg * vAvg;
+    const fAero = 0.5 * rho * params.cd * params.area * vAvg * vAvg;
     const fGrade = params.mass * CONSTANTS.g * Math.sin(theta);
     const fInertia = params.mass * acc;
     const fWheel = fRoll + fAero + fGrade + fInertia;
@@ -873,8 +884,9 @@ function estimateBrakeDemandOnly(targetKmh, params, route) {
     const theta = Math.atan2(dh, ds);
     const vAvg = Math.max((a.speedMps + b.speedMps) / 2, kmhToMps(3));
     const acc = (b.speedMps * b.speedMps - a.speedMps * a.speedMps) / (2 * ds);
+    const rho = airDensity((a.elev + b.elev) / 2);
     const fRoll = params.crr * params.mass * CONSTANTS.g * Math.cos(theta);
-    const fAero = 0.5 * CONSTANTS.rho * params.cd * params.area * vAvg * vAvg;
+    const fAero = 0.5 * rho * params.cd * params.area * vAvg * vAvg;
     const fGrade = params.mass * CONSTANTS.g * Math.sin(theta);
     const fInertia = params.mass * acc;
     brakeJ += Math.max(-(fRoll + fAero + fGrade + fInertia), 0) * ds;
@@ -901,6 +913,12 @@ function interpolateElevation(points, km) {
 
 function kmhToMps(kmh) {
   return kmh / 3.6;
+}
+
+// ISA troposphere: ~10 % air-density drop between Passy (578 m) and Plateau d'Assy (1039 m).
+// See ISA_DENSITY.
+function airDensity(elevM) {
+  return CONSTANTS.rho0 * Math.pow(1 - CONSTANTS.isaLapse * elevM, CONSTANTS.isaExp);
 }
 
 function renderRouteFacts(route) {
