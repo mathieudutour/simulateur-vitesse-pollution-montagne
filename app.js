@@ -548,7 +548,7 @@ const LEDGER = [
   ["Limites de vitesse", "maxspeed OSM quand tagué; 50 km/h en ville; hypothèse 90 km/h hors ville", ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132"]],
   ["Profil de vitesse montée", "v = min(v_curseur, v_limite, v_virage); accélération bornée par min(confort, F_dispo/m - F_resist) avec F_dispo = P_max(rho) x eta_dt / max(v, v_Pmax); freinage borné par confort + g sin(theta)", ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132", "CURVE", "COMFORT", "EU_POWER", "TORQUE_CURVE", "SAE_J1349"]],
   ["Descente en roue libre", "au-delà de v_curseur, pas de freinage tant que v < min(v_limite, v_virage)", ["DYN", "LEGIFRANCE", "LEGIFRANCE_R4132", "CURVE", "COMFORT"]],
-  ["Bilan des forces", "F = m a + Crr(v) m g cos(theta) + 0,5 rho(h) Cd A v2 + m g sin(theta); Crr(v) = Crr0 (1 + (v/100)^2)", ["DYN", "MICHELIN_CRR"]],
+  ["Bilan des forces", "F = m a + Crr(v) m g cos(theta) + 0,5 rho(h) Cd A v2 + m g sin(theta); Crr(v) = Crr0 (1 + (v/100)^2); intégrales aero et roulement utilisent <v2> = (v_a2 + v_b2)/2", ["DYN", "MICHELIN_CRR"]],
   ["Conditions aux limites", "Vitesse nulle au départ (Super U), à l'arrivée (maison médicale) et au point de retournement (aller-retour)", []],
   ["Cinématique freinage", "v2 = v0 2 + 2 a s", ["DYN", "COMFORT"]],
   ["Véhicule Nissan Note", "m=1118 kg; Cd=0,30; A=2,25 m2; Crr=0,009; cyl. 1,4 L", ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15"]],
@@ -979,6 +979,10 @@ function simulate(targetKmh, params, route) {
   // Idle fuel still flows whenever the engine is not in deceleration fuel-cut: at low
   // speed (below DFCO threshold) or when the wheels are pulling. See IDLE_FUEL.
   let idleSecondsS = 0;
+  // Diagnostic: distance over which the engine cannot produce positive acceleration at
+  // the local slope and speed (poweredAccel < 0). Useful when comparing heavy vehicles
+  // on the steeper segments of the route. See EU_POWER, TORQUE_CURVE.
+  let powerLimitedDistanceM = 0;
   const brakeBySegment = [];
 
   for (let i = 0; i < n; i += 1) {
@@ -990,13 +994,19 @@ function simulate(targetKmh, params, route) {
     const vAvg = Math.max((a.speedMps + b.speedMps) / 2, kmhToMps(3));
     const acc = (b.speedMps * b.speedMps - a.speedMps * a.speedMps) / (2 * ds);
 
+    // For aero and the v^2 part of Crr(v), integrate over space: the spatial mean of v^2
+    // for constant-accel kinematics is (v_a^2 + v_b^2) / 2, NOT vAvg^2 (Jensen's
+    // inequality - the launch segment is otherwise undercounted by 2x).
+    const vSqMean = (a.speedMps * a.speedMps + b.speedMps * b.speedMps) / 2;
     const rho = airDensity((a.elev + b.elev) / 2);
-    const fRoll = effectiveCrr(params.crr, vAvg) * params.mass * CONSTANTS.g * Math.cos(theta);
-    const fAero = 0.5 * rho * params.cd * params.area * vAvg * vAvg;
+    const crrV = params.crr * (1 + vSqMean / (CONSTANTS.crrSpeedRefMps * CONSTANTS.crrSpeedRefMps));
+    const fRoll = crrV * params.mass * CONSTANTS.g * Math.cos(theta);
+    const fAero = 0.5 * rho * params.cd * params.area * vSqMean;
     const fGrade = params.mass * CONSTANTS.g * Math.sin(theta);
     const fInertia = params.mass * acc;
     const fWheel = fRoll + fAero + fGrade + fInertia;
     const dt = ds / vAvg;
+    if (poweredAccel(params, vAvg, theta, rho) < 0) powerLimitedDistanceM += ds;
 
     // When wheels pull (fWheel > 0), engine drives the car. When wheels overrun the engine
     // (fWheel < 0), some of the deceleration is absorbed by the engine itself (pumping +
@@ -1101,6 +1111,7 @@ function simulate(targetKmh, params, route) {
     brakePm10Mg: brakeTotalPm10Mg,
     roadPm10Mg: roadTsp * CONSTANTS.roadPM10 * 1000,
     brakePmHotspots,
+    powerLimitedKm: powerLimitedDistanceM / 1000,
   };
 }
 
@@ -1196,6 +1207,7 @@ function renderMetrics(a, b) {
     ["PM2,5 hors échappement", "pm25Mg", " mg", 0, true, ["EMEP", "BEDDOWS", "BRAKE", ...speedRefs, ...vehicleRefs], "Fractions PM2,5 appliquées aux émissions hors échappement."],
     ["Temps", "timeMin", " min", 1, true, ["OSM", "LEGIFRANCE", "CURVE", "COMFORT"], "Distance segmentée divisée par le profil de vitesse plafonné par les limites locales.", "absolute"],
     ["Vitesse moyenne", "avgKmh", " km/h", 1, false, ["OSM", "LEGIFRANCE", "CURVE", "COMFORT"], "Distance routière divisée par le temps simulé."],
+    ["Distance moteur saturé", "powerLimitedKm", " km", 2, true, ["EU_POWER", "TORQUE_CURVE", "SAE_J1349", ...vehicleRefs], "Distance sur laquelle le moteur ne peut pas accélérer au régime de pente local (poweredAccel < 0); diagnostic des montées soutenues.", "absolute"],
   ];
 
   document.getElementById("metrics").innerHTML = rows
