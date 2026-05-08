@@ -540,7 +540,8 @@ const LEDGER = [
   ["Véhicule BMW X5 4.8is", "m=2275 kg; Cd=0,38; A=2,74 m2; Crr=0,009; cyl. 4,8 L", ["X5_SPEC", "NHTSA", "NAP15"]],
   ["Véhicule Dodge Ram 1500", "m=2366 kg; Cd=0,53; A=3,31 m2; Crr=0,009; cyl. 5,7 L", ["RAM_SPEC", "RAM_AREA", "NHTSA", "NAP15"]],
   ["Carburant moteur", "Carburant = (E_roue / 0,85 / 0,40) / PCI + 0,21 g/s/L cylindrée x t_DFCO_off", ["WILLANS", "EPA_DRIVELINE", "IDLE_FUEL", "NAP15", "DOE"]],
-  ["Démarrage à froid", "Budget +30 % carburant et x7 PM échappement appliqué pro rata sur les premières coldStart secondes; curseur dans Avancé, désactivable à 0", ["EMEP_EXHAUST", "COLD_START"]],
+  ["Démarrage à froid", "Budget +30 % carburant et x7 PM échappement pro rata sur les coldStart premières secondes; aller-retour = 2 démarrages (moteur refroidit au point de retournement); curseur dans Avancé, désactivable à 0", ["EMEP_EXHAUST", "COLD_START"]],
+  ["Profil aller-retour", "Aller-retour = montée à plafond ferme (identique au sens 'up') + descente en roue libre; deux démarrages à froid", ["DYN", "COMFORT", "COLD_START"]],
   ["Air et gravité", "rho(h) = 1,225 (1 - 2,2557e-5 h)^4,2559 kg/m3; g = 9,80665 m/s2", ["ISA", "ISA_DENSITY"]],
   ["Essence", "PCI = 31,82 MJ/L, dérivé de 112114-116090 Btu/gal", ["DOE"]],
   ["Prix essence Super U", "SP95-E10 = 1,989 €/L; flux consulté le 06/05/2026, dernier relevé station du 25/03/2026 09:38", ["FUELPRICE", "SUPERU"]],
@@ -825,12 +826,7 @@ function buildSpeedProfile(targetKmh, params, route, n) {
   points[0].speedMps = 0;
   points[points.length - 1].speedMps = 0;
   if (route.direction === "round") {
-    const midM = ROUTE.distanceM;
-    let nearest = 0;
-    for (let i = 1; i < points.length; i += 1) {
-      if (Math.abs(points[i].m - midM) < Math.abs(points[nearest].m - midM)) nearest = i;
-    }
-    points[nearest].speedMps = 0;
+    points[findIndexNearestM(points, ROUTE.distanceM)].speedMps = 0;
   }
 
   // Forward pass: accel is min(comfort, engine-limited at this slope and speed). Heavy
@@ -858,23 +854,38 @@ function buildSpeedProfile(targetKmh, params, route, n) {
     points[i].speedMps = Math.min(points[i].speedMps, brakeLimit);
   }
 
-  if (!cruiseIsHardCap) {
-    return applyCoastingDescentProfile(points, targetMps, params);
-  }
+  if (cruiseIsHardCap) return points;
 
-  return points;
+  // Descent or round trip: apply the coasting profile only to the descent half. For a
+  // round trip, the uphill leg stays under the hard cap from the forward pass — same
+  // physics as picking the dedicated "up" direction. The descent leg starts at the
+  // turnaround point, where the speed was anchored to 0 above.
+  const coastStartIdx = route.direction === "round"
+    ? findIndexNearestM(points, ROUTE.distanceM)
+    : 0;
+  return applyCoastingDescentProfile(points, targetMps, params, coastStartIdx);
+}
+
+function findIndexNearestM(points, targetM) {
+  let nearest = 0;
+  for (let i = 1; i < points.length; i += 1) {
+    if (Math.abs(points[i].m - targetM) < Math.abs(points[nearest].m - targetM)) nearest = i;
+  }
+  return nearest;
 }
 
 // On a descent the cruise slider acts as a soft cap: the car coasts above it but powers
 // up to it when coasting drag would slow the car below. Curve and limit caps were already
 // pre-applied by the backward pass in buildSpeedProfile, so the Math.min below preserves
 // them — do not "fix" by removing the clamp. See DYN.
-function applyCoastingDescentProfile(capPoints, targetMps, params) {
+//
+// For round trips, startIdx points at the turnaround; the uphill half keeps the hard-cap
+// result from the forward pass (same physics as a one-way "up" trip).
+function applyCoastingDescentProfile(capPoints, targetMps, params, startIdx) {
   const minSpeed = kmhToMps(5);
   const points = capPoints.map((point) => ({ ...point }));
-  points[0].speedMps = Math.min(points[0].speedMps, Math.max(minSpeed, targetMps));
 
-  for (let i = 1; i < points.length; i += 1) {
+  for (let i = startIdx + 1; i < points.length; i += 1) {
     const previous = points[i - 1];
     const point = points[i];
     const ds = point.m - previous.m;
@@ -1003,8 +1014,11 @@ function simulate(targetKmh, params, route) {
   // Cold-start budget: SI gasoline burns ~30 % more fuel and emits ~7x exhaust PM until
   // catalyst light-off. Apply the budget pro rata to the first coldStartSeconds of the
   // trip; setting the slider to 0 turns the budget off for warm-engine comparisons.
-  // See COLD_START.
-  const coldFraction = Math.min(1, (params.coldStartSeconds || 0) / Math.max(timeS, 1));
+  // A round trip has two cold starts (engine cools at the turnaround), so the cold
+  // window is doubled. See COLD_START.
+  const coldStartCount = route.direction === "round" ? 2 : 1;
+  const coldWindowS = coldStartCount * (params.coldStartSeconds || 0);
+  const coldFraction = Math.min(1, coldWindowS / Math.max(timeS, 1));
   const coldStartFuelL = coldFraction * warmFuelL * 0.30;
   const fuelL = warmFuelL + coldStartFuelL;
   const fuelCostEur = fuelL * CONSTANTS.fuelPriceEurPerL;
