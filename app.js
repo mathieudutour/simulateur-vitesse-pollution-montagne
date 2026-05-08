@@ -162,6 +162,12 @@ const SOURCES = [
     note: "Mesures sur banc dynamométrique: ~10 mg PM10 par MJ d'énergie dissipée aux plaquettes (calibrage TSP=10 mg/MJ utilisé ici).",
   },
   {
+    id: "EU_POWER",
+    title: "UTAC / constructeurs, puissances homologuées",
+    url: "https://www.auto-data.net/",
+    note: "Puissance maxi des trois profils: Nissan Note 1.4 16v ~65 kW, BMW X5 4.8is ~268 kW, Dodge Ram 1500 5.7 Hemi ~254 kW.",
+  },
+  {
     id: "ENGINE_BRAKE",
     title: "Heywood, Internal Combustion Engine Fundamentals, ch. 13",
     url: "https://www.mheducation.com/highered/product/internal-combustion-engine-fundamentals-2e-heywood/M9781260116106.html",
@@ -463,7 +469,8 @@ const VEHICLES = {
     area: 2.25,
     crr: 0.009,
     displacementL: 1.4,
-    sources: ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15", "WILLANS", "EPA_DRIVELINE", "PHOTO_NOTE"],
+    maxPowerW: 65000,
+    sources: ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15", "WILLANS", "EPA_DRIVELINE", "EU_POWER", "PHOTO_NOTE"],
   },
   suv: {
     label: "BMW X5 4.8is",
@@ -473,7 +480,8 @@ const VEHICLES = {
     area: 2.74,
     crr: 0.009,
     displacementL: 4.8,
-    sources: ["X5_SPEC", "NHTSA", "NAP15", "WILLANS", "EPA_DRIVELINE", "PHOTO_X5"],
+    maxPowerW: 268000,
+    sources: ["X5_SPEC", "NHTSA", "NAP15", "WILLANS", "EPA_DRIVELINE", "EU_POWER", "PHOTO_X5"],
   },
   pickup: {
     label: "Dodge Ram 1500",
@@ -483,7 +491,8 @@ const VEHICLES = {
     area: 3.31,
     crr: 0.009,
     displacementL: 5.7,
-    sources: ["RAM_SPEC", "RAM_AREA", "NHTSA", "NAP15", "WILLANS", "EPA_DRIVELINE", "PHOTO_RAM"],
+    maxPowerW: 254000,
+    sources: ["RAM_SPEC", "RAM_AREA", "NHTSA", "NAP15", "WILLANS", "EPA_DRIVELINE", "EU_POWER", "PHOTO_RAM"],
   },
 };
 
@@ -493,7 +502,7 @@ const LEDGER = [
   ["Altitudes", "45 points EU-DEM 25 m, 578,1 à 1038,7 m", ["OTD"]],
   ["Virages", "Rayons déduits de la géométrie OSM; v = sqrt(a_lateral x R)", ["OSM", "CURVE"]],
   ["Limites de vitesse", "maxspeed OSM quand tagué; 50 km/h en ville; hypothèse 90 km/h hors ville", ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132"]],
-  ["Profil de vitesse montée", "v = min(v_curseur, v_limite, v_virage), avec approche freinage/accélération", ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132", "CURVE", "COMFORT"]],
+  ["Profil de vitesse montée", "v = min(v_curseur, v_limite, v_virage); accélération bornée par min(confort, P_max x eta_dt / v - F_resist); freinage borné par confort + g sin(theta)", ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132", "CURVE", "COMFORT", "EU_POWER"]],
   ["Descente en roue libre", "au-delà de v_curseur, pas de freinage tant que v < min(v_limite, v_virage)", ["DYN", "LEGIFRANCE", "LEGIFRANCE_R4132", "CURVE", "COMFORT"]],
   ["Bilan des forces", "F = m a + Crr m g cos(theta) + 0,5 rho Cd A v2 + m g sin(theta)", ["DYN"]],
   ["Cinématique freinage", "v2 = v0 2 + 2 a s", ["DYN", "COMFORT"]],
@@ -603,6 +612,7 @@ function getParams() {
     area: vehicle.area,
     crr: vehicle.crr,
     displacementL: vehicle.displacementL,
+    maxPowerW: vehicle.maxPowerW,
     latAccel: state.latAccel,
     longAccel: state.longAccel,
   };
@@ -619,6 +629,7 @@ function initVehicleTooltips() {
       ["Surface", fmt(vehicle.area, 2, " m2")],
       ["Crr", fmt(vehicle.crr, 3, "")],
       ["Cylindrée", fmt(vehicle.displacementL, 1, " L")],
+      ["Puissance", fmt(vehicle.maxPowerW / 1000, 0, " kW")],
       ["Sources", vehicle.sources.join(" / ")],
     ];
     const tooltipId = `vehicle-tooltip-${button.dataset.vehicle}`;
@@ -741,8 +752,16 @@ function buildSpeedProfile(targetKmh, params, route, n) {
         curveSpeedLimitMps,
         Math.sqrt(params.latAccel * curve.radiusM),
       );
-      const gap = Math.abs(curveM - m);
-      const approachLimit = Math.sqrt(curveCap * curveCap + 2 * params.longAccel * gap);
+      // Approach lookahead only; departure (m > curveM) is handled by the forward pass
+      // with engine-power-limited acceleration. Effective decel is gravity-aided uphill
+      // and gravity-opposed downhill; clamp >= 0.5 m/s2 so very steep slopes still allow
+      // a stop. See COMFORT.
+      if (m >= curveM) return;
+      const elevHere = interpolateElevation(route.points, km);
+      const elevCurve = interpolateElevation(route.points, curve.km);
+      const slopeTheta = Math.atan2(elevCurve - elevHere, Math.max(curveM - m, 0.1));
+      const decel = Math.max(0.5, params.longAccel + CONSTANTS.g * Math.sin(slopeTheta));
+      const approachLimit = Math.sqrt(curveCap * curveCap + 2 * decel * (curveM - m));
       speedMps = Math.min(speedMps, approachLimit);
     });
 
@@ -755,15 +774,28 @@ function buildSpeedProfile(targetKmh, params, route, n) {
     });
   }
 
+  // Forward pass: accel is min(comfort, engine-limited at this slope and speed). Heavy
+  // vehicles cannot match the comfort target uphill at high v. See EU_POWER.
   for (let i = 1; i < points.length; i += 1) {
-    const ds = points[i].m - points[i - 1].m;
-    const accelLimit = Math.sqrt(points[i - 1].speedMps * points[i - 1].speedMps + 2 * params.longAccel * ds);
-    points[i].speedMps = Math.min(points[i].speedMps, accelLimit);
+    const a = points[i - 1];
+    const b = points[i];
+    const ds = b.m - a.m;
+    const theta = Math.atan2(b.elev - a.elev, Math.max(ds, 0.1));
+    const rho = airDensity((a.elev + b.elev) / 2);
+    const accelEff = Math.min(params.longAccel, poweredAccel(params, a.speedMps, theta, rho));
+    const accelLimit = Math.sqrt(Math.max(0, a.speedMps * a.speedMps + 2 * accelEff * ds));
+    points[i].speedMps = Math.min(points[i].speedMps, Math.max(minSpeed, accelLimit));
   }
 
+  // Backward pass: comfort decel adjusted for slope (uphill braking is gravity-aided,
+  // downhill is gravity-opposed). Clamp >= 0.5 m/s2 to keep stops feasible on steep grades.
   for (let i = points.length - 2; i >= 0; i -= 1) {
-    const ds = points[i + 1].m - points[i].m;
-    const brakeLimit = Math.sqrt(points[i + 1].speedMps * points[i + 1].speedMps + 2 * params.longAccel * ds);
+    const a = points[i];
+    const b = points[i + 1];
+    const ds = b.m - a.m;
+    const theta = Math.atan2(b.elev - a.elev, Math.max(ds, 0.1));
+    const decelEff = Math.max(0.5, params.longAccel + CONSTANTS.g * Math.sin(theta));
+    const brakeLimit = Math.sqrt(b.speedMps * b.speedMps + 2 * decelEff * ds);
     points[i].speedMps = Math.min(points[i].speedMps, brakeLimit);
   }
 
@@ -808,6 +840,19 @@ function coastingAcceleration(speedMps, a, b, params) {
   const fAero = 0.5 * rho * params.cd * params.area * speed * speed;
   const fGrade = params.mass * CONSTANTS.g * Math.sin(theta);
   return -(fRoll + fAero + fGrade) / params.mass;
+}
+
+// Maximum forward acceleration the powertrain can deliver at speed v on slope theta.
+// F_avail = P_max * eta_dt / v - F_resist; the comfort accel from the slider is then
+// clamped by this so heavy SUVs cannot accelerate uphill at the same rate as the Note.
+// See EU_POWER, EPA_DRIVELINE.
+function poweredAccel(params, speedMps, theta, rho) {
+  const v = Math.max(speedMps, kmhToMps(5));
+  const fRoll = params.crr * params.mass * CONSTANTS.g * Math.cos(theta);
+  const fAero = 0.5 * rho * params.cd * params.area * v * v;
+  const fGrade = params.mass * CONSTANTS.g * Math.sin(theta);
+  const fAvail = (params.maxPowerW * CONSTANTS.drivetrainEfficiency) / v;
+  return (fAvail - fRoll - fAero - fGrade) / params.mass;
 }
 
 function speedLimitAt(route, km) {
