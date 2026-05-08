@@ -111,7 +111,19 @@ const SOURCES = [
     id: "EPA",
     title: "U.S. EPA GHG Equivalencies",
     url: "https://www.epa.gov/energy/greenhouse-gas-equivalencies-calculator-calculations-and-references",
-    note: "Facteur 8887 g CO2 par gallon d'essence consommé.",
+    note: "Facteur 8887 g CO2 par gallon d'essence consommé (référence pure essence).",
+  },
+  {
+    id: "ADEME_E10",
+    title: "ADEME Base Carbone, SP95-E10 (combustion)",
+    url: "https://base-carbone.ademe.fr/",
+    note: "Facteur d'émission combustion SP95-E10 ~2,21 kg CO2/L; reflète la fraction bioéthanol et la densité moindre du mélange.",
+  },
+  {
+    id: "EMEP_TIER3",
+    title: "EMEP/EEA Guidebook 2023, road transport, Tier 3 fuel-based",
+    url: "https://www.eea.europa.eu/en/analysis/publications/emep-eea-guidebook-2023/part-b-sectoral-guidance-chapters/1-energy/1-a-combustion/1-a-3-b-i",
+    note: "Approche Tier 3 par masse de carburant: PM échappement ~25 mg par kg d'essence brûlée pour un Euro 5 SI, calibré pour reproduire le facteur 1,4 mg/km à 56 g/km de carburant.",
   },
   {
     id: "EMEP",
@@ -394,6 +406,12 @@ const CONSTANTS = {
   gasolineLhvMJPerL: 31.82,
   gasolineDensityKgPerL: 0.745,
   fuelPriceEurPerL: 1.989,
+  // SP95-E10 combustion factor (ADEME Base Carbone). Le facteur EPA 8887 g/gal vise
+  // l'essence pure et surestime ~6 % le CO2 par litre de E10. See ADEME_E10.
+  co2KgPerL: 2.21,
+  // Tier 3 EMEP par masse de carburant: les émissions PM échappement suivent le
+  // débit de carburant plutôt que la distance. See EMEP_TIER3.
+  exhaustPmMgPerKgFuel: 25,
   // Willans-line: traction part of fuel = (P_wheel / eta_dt) / eta_indicated.
   // eta_brake ~22 % (NAP15) emerges from eta_indicated x mech / (mech + idle), so the
   // legacy flat-22 % value is preserved at the calibration point but degrades at low
@@ -405,7 +423,6 @@ const CONSTANTS = {
   idleFuelGPerSPerL: 0.21,
   // Below this speed, deceleration fuel-cut (DFCO) is disabled and idle fuel still flows.
   dfcoMinKmh: 25,
-  co2KgPerL: 8.887 / 3.785411784,
   tyreTspGKm: 0.0107,
   brakeTspGKm: 0.0142,
   roadTspGKm: 0.015,
@@ -415,7 +432,6 @@ const CONSTANTS = {
   brakePM25: 0.39,
   roadPM10: 0.5,
   roadPM25: 0.27,
-  exhaustPmMgKm: 1.4,
   pmMinKmh: 25,
   pmReferenceKmh: 45,
   urbanSpeedKmh: 50,
@@ -472,11 +488,11 @@ const LEDGER = [
   ["Air et gravité", "rho(h) = 1,225 (1 - 2,2557e-5 h)^4,2559 kg/m3; g = 9,80665 m/s2", ["ISA", "ISA_DENSITY"]],
   ["Essence", "PCI = 31,82 MJ/L, dérivé de 112114-116090 Btu/gal", ["DOE"]],
   ["Prix essence Super U", "SP95-E10 = 1,989 €/L; flux consulté le 06/05/2026, dernier relevé station du 25/03/2026 09:38", ["FUELPRICE", "SUPERU"]],
-  ["CO2 essence", "8887 g CO2/gal = 2,35 kg CO2/L", ["EPA"]],
+  ["CO2 essence E10", "2,21 kg CO2/L SP95-E10 (ADEME Base Carbone, combustion TtW)", ["ADEME_E10"]],
   ["Pneus", "TSP = 0,0107 g/km x m/m_Note; PM10/TSP = 0,60; PM2,5/TSP = 0,42", ["EMEP", "BEDDOWS"]],
   ["Freins", "TSP = 0,0142 g/km x m/m_Note x max(1, max_25..V(Efrein + Ecin_perdue)/(Efrein_45 + Ecin_perdue_45)); PM10/TSP = 0,98; PM2,5/TSP = 0,39", ["EMEP", "BRAKE", "BEDDOWS"]],
   ["Chaussée", "TSP = 0,0150 g/km x m/m_Note; PM10/TSP = 0,50; PM2,5/TSP = 0,27", ["EMEP", "BEDDOWS"]],
-  ["PM échappement essence", "1,4 mg/km; PM échappement ajouté à PM10 total et PM2,5 total", ["EMEP_EXHAUST"]],
+  ["PM échappement essence", "PM = 25 mg / kg de carburant (Tier 3 fuel-based); ajouté à PM10 total et PM2,5 total", ["EMEP_EXHAUST", "EMEP_TIER3"]],
   ["Spatialisation freins", "Part de PM freinage proportionnelle à l'énergie dissipée localement", ["BRAKE", "EMEP"]],
 ];
 
@@ -860,7 +876,9 @@ function simulate(targetKmh, params, route) {
     tyreTsp * CONSTANTS.tyrePM25 +
     brakeTsp * CONSTANTS.brakePM25 +
     roadTsp * CONSTANTS.roadPM25;
-  const exhaustPmMg = distanceKm * CONSTANTS.exhaustPmMgKm;
+  // Tier 3 EMEP: PM échappement proportionnel à la masse de carburant brûlée. See EMEP_TIER3.
+  const fuelKg = fuelL * CONSTANTS.gasolineDensityKgPerL;
+  const exhaustPmMg = fuelKg * CONSTANTS.exhaustPmMgPerKgFuel;
 
   const brakeTotalPm10Mg = brakeTsp * CONSTANTS.brakePM10 * 1000;
   const brakeEnergySum = brakeBySegment.reduce((sum, row) => sum + row.energyJ, 0);
