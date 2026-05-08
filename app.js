@@ -81,7 +81,25 @@ const SOURCES = [
     id: "NAP15",
     title: "National Academies, SI gasoline engines, 2015",
     url: "https://www.nationalacademies.org/read/21744/chapter/4",
-    note: "Rendement thermique au frein typique autour de 22 % en conditions FTP.",
+    note: "Rendement thermique au frein typique autour de 22 % en conditions FTP; rendement indiqué de l'ordre de 38-40 %.",
+  },
+  {
+    id: "WILLANS",
+    title: "Guzzella & Sciarretta, Vehicle Propulsion Systems, 3rd ed., ch. 2",
+    url: "https://link.springer.com/book/10.1007/978-3-642-35913-2",
+    note: "Droite de Willans: P_carburant = (P_roue / eta_transmission + P_idle) / eta_indique; capture la dépendance charge du rendement effectif.",
+  },
+  {
+    id: "EPA_DRIVELINE",
+    title: "An & Stodolsky, ANL/ESD-43, vehicle driveline efficiency",
+    url: "https://www.osti.gov/biblio/664251",
+    note: "Rendement de transmission boîte manuelle / pont autour de 0,85 (boîte automatique 0,80-0,82) repris pour la chaîne de traction.",
+  },
+  {
+    id: "IDLE_FUEL",
+    title: "Argonne / SAE 2014-01-1147, gasoline idle fuel rate",
+    url: "https://www.sae.org/publications/technical-papers/content/2014-01-1147/",
+    note: "Consommation au ralenti d'un moteur essence 1,4-1,6 L environ 0,30 g/s; sert de plancher de carburant et de base pour le scaling cylindrée.",
   },
   {
     id: "DOE",
@@ -374,7 +392,19 @@ const CONSTANTS = {
   isaLapse: 2.2557e-5,
   isaExp: 4.2559,
   gasolineLhvMJPerL: 31.82,
+  gasolineDensityKgPerL: 0.745,
   fuelPriceEurPerL: 1.989,
+  // Willans-line: traction part of fuel = (P_wheel / eta_dt) / eta_indicated.
+  // eta_brake ~22 % (NAP15) emerges from eta_indicated x mech / (mech + idle), so the
+  // legacy flat-22 % value is preserved at the calibration point but degrades at low
+  // load and improves near peak BMEP. See WILLANS, NAP15, EPA_DRIVELINE.
+  indicatedEfficiency: 0.40,
+  drivetrainEfficiency: 0.85,
+  // Idle fuel scales with displacement; 0,21 g/s/L tracks Argonne data for warm SI.
+  // See IDLE_FUEL.
+  idleFuelGPerSPerL: 0.21,
+  // Below this speed, deceleration fuel-cut (DFCO) is disabled and idle fuel still flows.
+  dfcoMinKmh: 25,
   co2KgPerL: 8.887 / 3.785411784,
   tyreTspGKm: 0.0107,
   brakeTspGKm: 0.0142,
@@ -400,8 +430,8 @@ const VEHICLES = {
     cd: 0.3,
     area: 2.25,
     crr: 0.009,
-    efficiency: 0.22,
-    sources: ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15", "PHOTO_NOTE"],
+    displacementL: 1.4,
+    sources: ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15", "WILLANS", "EPA_DRIVELINE", "PHOTO_NOTE"],
   },
   suv: {
     label: "BMW X5 4.8is",
@@ -410,8 +440,8 @@ const VEHICLES = {
     cd: 0.38,
     area: 2.74,
     crr: 0.009,
-    efficiency: 0.22,
-    sources: ["X5_SPEC", "NHTSA", "NAP15", "PHOTO_X5"],
+    displacementL: 4.8,
+    sources: ["X5_SPEC", "NHTSA", "NAP15", "WILLANS", "EPA_DRIVELINE", "PHOTO_X5"],
   },
   pickup: {
     label: "Dodge Ram 1500",
@@ -420,8 +450,8 @@ const VEHICLES = {
     cd: 0.53,
     area: 3.31,
     crr: 0.009,
-    efficiency: 0.22,
-    sources: ["RAM_SPEC", "RAM_AREA", "NHTSA", "NAP15", "PHOTO_RAM"],
+    displacementL: 5.7,
+    sources: ["RAM_SPEC", "RAM_AREA", "NHTSA", "NAP15", "WILLANS", "EPA_DRIVELINE", "PHOTO_RAM"],
   },
 };
 
@@ -435,9 +465,10 @@ const LEDGER = [
   ["Descente en roue libre", "au-delà de v_curseur, pas de freinage tant que v < min(v_limite, v_virage)", ["DYN", "LEGIFRANCE", "LEGIFRANCE_R4132", "CURVE", "COMFORT"]],
   ["Bilan des forces", "F = m a + Crr m g cos(theta) + 0,5 rho Cd A v2 + m g sin(theta)", ["DYN"]],
   ["Cinématique freinage", "v2 = v0 2 + 2 a s", ["DYN", "COMFORT"]],
-  ["Véhicule Nissan Note", "m=1118 kg; Cd=0,30; A=2,25 m2; Crr=0,009; eta=22 %", ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15"]],
-  ["Véhicule BMW X5 4.8is", "m=2275 kg; Cd=0,38; A=2,74 m2; Crr=0,009; eta=22 %", ["X5_SPEC", "NHTSA", "NAP15"]],
-  ["Véhicule Dodge Ram 1500", "m=2366 kg; Cd=0,53; A=3,31 m2; Crr=0,009; eta=22 %", ["RAM_SPEC", "RAM_AREA", "NHTSA", "NAP15"]],
+  ["Véhicule Nissan Note", "m=1118 kg; Cd=0,30; A=2,25 m2; Crr=0,009; cyl. 1,4 L", ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15"]],
+  ["Véhicule BMW X5 4.8is", "m=2275 kg; Cd=0,38; A=2,74 m2; Crr=0,009; cyl. 4,8 L", ["X5_SPEC", "NHTSA", "NAP15"]],
+  ["Véhicule Dodge Ram 1500", "m=2366 kg; Cd=0,53; A=3,31 m2; Crr=0,009; cyl. 5,7 L", ["RAM_SPEC", "RAM_AREA", "NHTSA", "NAP15"]],
+  ["Carburant moteur", "Carburant = (E_roue / 0,85 / 0,40) / PCI + 0,21 g/s/L cylindrée x t_DFCO_off", ["WILLANS", "EPA_DRIVELINE", "IDLE_FUEL", "NAP15", "DOE"]],
   ["Air et gravité", "rho(h) = 1,225 (1 - 2,2557e-5 h)^4,2559 kg/m3; g = 9,80665 m/s2", ["ISA", "ISA_DENSITY"]],
   ["Essence", "PCI = 31,82 MJ/L, dérivé de 112114-116090 Btu/gal", ["DOE"]],
   ["Prix essence Super U", "SP95-E10 = 1,989 €/L; flux consulté le 06/05/2026, dernier relevé station du 25/03/2026 09:38", ["FUELPRICE", "SUPERU"]],
@@ -538,7 +569,7 @@ function getParams() {
     cd: vehicle.cd,
     area: vehicle.area,
     crr: vehicle.crr,
-    efficiency: vehicle.efficiency,
+    displacementL: vehicle.displacementL,
     latAccel: state.latAccel,
     longAccel: state.longAccel,
   };
@@ -554,7 +585,7 @@ function initVehicleTooltips() {
       ["Cd", fmt(vehicle.cd, 2, "")],
       ["Surface", fmt(vehicle.area, 2, " m2")],
       ["Crr", fmt(vehicle.crr, 3, "")],
-      ["Rendement", fmt(vehicle.efficiency * 100, 0, " %")],
+      ["Cylindrée", fmt(vehicle.displacementL, 1, " L")],
       ["Sources", vehicle.sources.join(" / ")],
     ];
     const tooltipId = `vehicle-tooltip-${button.dataset.vehicle}`;
@@ -766,6 +797,9 @@ function simulate(targetKmh, params, route) {
   let inertiaJ = 0;
   let decelJ = 0;
   let timeS = 0;
+  // Idle fuel still flows whenever the engine is not in deceleration fuel-cut: at low
+  // speed (below DFCO threshold) or when the wheels are pulling. See IDLE_FUEL.
+  let idleSecondsS = 0;
   const brakeBySegment = [];
 
   for (let i = 0; i < n; i += 1) {
@@ -783,6 +817,7 @@ function simulate(targetKmh, params, route) {
     const fGrade = params.mass * CONSTANTS.g * Math.sin(theta);
     const fInertia = params.mass * acc;
     const fWheel = fRoll + fAero + fGrade + fInertia;
+    const dt = ds / vAvg;
 
     tractionJ += Math.max(fWheel, 0) * ds;
     brakeJ += Math.max(-fWheel, 0) * ds;
@@ -791,15 +826,23 @@ function simulate(targetKmh, params, route) {
     climbJ += Math.max(fGrade, 0) * ds;
     inertiaJ += Math.max(fInertia, 0) * ds;
     decelJ += Math.max(-fInertia, 0) * ds;
-    timeS += ds / vAvg;
+    timeS += dt;
+    if (fWheel > 0 || vAvg < kmhToMps(CONSTANTS.dfcoMinKmh)) {
+      idleSecondsS += dt;
+    }
     brakeBySegment.push({
       km: (a.km + b.km) / 2,
       energyJ: Math.max(-fWheel, 0) * ds,
     });
   }
 
-  const fuelEnergyJ = tractionJ / Math.max(params.efficiency, 0.01);
-  const fuelL = fuelEnergyJ / (CONSTANTS.gasolineLhvMJPerL * 1e6);
+  // Willans / Pachernegg: traction fuel = wheel work / (eta_dt x eta_indicated),
+  // with idle fuel added during DFCO-disabled time. See WILLANS, EPA_DRIVELINE, IDLE_FUEL.
+  const tractionFuelJ = tractionJ / (CONSTANTS.drivetrainEfficiency * CONSTANTS.indicatedEfficiency);
+  const tractionFuelL = tractionFuelJ / (CONSTANTS.gasolineLhvMJPerL * 1e6);
+  const idleFuelG = CONSTANTS.idleFuelGPerSPerL * params.displacementL * idleSecondsS;
+  const idleFuelL = idleFuelG / (CONSTANTS.gasolineDensityKgPerL * 1000);
+  const fuelL = tractionFuelL + idleFuelL;
   const fuelCostEur = fuelL * CONSTANTS.fuelPriceEurPerL;
   const distanceKm = distanceM / 1000;
   const avgKmh = (distanceKm / (timeS / 3600));

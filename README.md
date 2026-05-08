@@ -16,8 +16,9 @@ Le modèle est volontairement transparent:
   et par une hypothèse 90 km/h hors ville quand aucun `maxspeed` n'est tagué;
 - en descente, la vitesse A/B n'impose pas un freinage permanent: le véhicule roule en
   roue libre au-dessus de la consigne et freine seulement pour une limite ou un virage;
-- le carburant est dérivé de l'énergie positive aux roues, du rendement moteur et du PCI de
-  l'essence;
+- le carburant suit une droite de Willans: l'énergie aux roues est divisée par le rendement
+  de transmission (0,85) puis par le rendement indiqué (0,40), et un débit de ralenti
+  dépendant de la cylindrée s'ajoute hors coupure d'injection (DFCO);
 - le coût carburant multiplie les litres simulés par le prix SP95-E10 déclaré dans le flux
   officiel prix-carburants.gouv.fr pour le Super U Passy;
 - les particules pneus, freins et chaussée utilisent les facteurs EMEP/EEA;
