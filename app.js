@@ -191,6 +191,18 @@ const SOURCES = [
     url: "https://www.mheducation.com/highered/product/internal-combustion-engine-fundamentals-2e-heywood/M9781260116106.html",
     note: "Couple de freinage moteur (FMEP+pompage) approché par une force lineaire en vitesse et en cylindrée; calibré à environ 0,3 m/s2 de décélération supplémentaire pour une 1,4 L à 90 km/h.",
   },
+  {
+    id: "TORQUE_CURVE",
+    title: "Heywood, Internal Combustion Engine Fundamentals, ch. 2-3",
+    url: "https://www.mheducation.com/highered/product/internal-combustion-engine-fundamentals-2e-heywood/M9781260116106.html",
+    note: "Approche couple constant en dessous de la vitesse de puissance maxi puis puissance constante au-delà: F_dispo = P_max x eta_dt / max(v, v_Pmax). v_Pmax ~30 m/s pour une voiture particulière en rapport optimal.",
+  },
+  {
+    id: "SAE_J1349",
+    title: "SAE J1349, naturally aspirated engine power correction",
+    url: "https://www.sae.org/standards/content/j1349_201109/",
+    note: "Correction de puissance pour un moteur atmosphérique en altitude: P(h) ~ P_0 x rho(h) / rho_0; ~10 % de perte au Plateau d'Assy (1039 m).",
+  },
 ];
 
 const ROUTE = {
@@ -493,9 +505,10 @@ const VEHICLES = {
     crr: 0.009,
     displacementL: 1.4,
     maxPowerW: 65000,
+    pmaxSpeedMps: 30,
     euroTier: "Euro 5",
     exhaustPmMgPerKgFuel: 25,
-    sources: ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15", "WILLANS", "EPA_DRIVELINE", "EU_POWER", "EMEP_EURO_TIERS", "PHOTO_NOTE"],
+    sources: ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15", "WILLANS", "EPA_DRIVELINE", "EU_POWER", "TORQUE_CURVE", "SAE_J1349", "EMEP_EURO_TIERS", "PHOTO_NOTE"],
   },
   suv: {
     label: "BMW X5 4.8is",
@@ -506,9 +519,10 @@ const VEHICLES = {
     crr: 0.009,
     displacementL: 4.8,
     maxPowerW: 268000,
+    pmaxSpeedMps: 35,
     euroTier: "Euro 3",
     exhaustPmMgPerKgFuel: 120,
-    sources: ["X5_SPEC", "NHTSA", "NAP15", "WILLANS", "EPA_DRIVELINE", "EU_POWER", "EMEP_EURO_TIERS", "PHOTO_X5"],
+    sources: ["X5_SPEC", "NHTSA", "NAP15", "WILLANS", "EPA_DRIVELINE", "EU_POWER", "TORQUE_CURVE", "SAE_J1349", "EMEP_EURO_TIERS", "PHOTO_X5"],
   },
   pickup: {
     label: "Dodge Ram 1500",
@@ -519,9 +533,10 @@ const VEHICLES = {
     crr: 0.009,
     displacementL: 5.7,
     maxPowerW: 254000,
+    pmaxSpeedMps: 35,
     euroTier: "Tier 2 Bin 5",
     exhaustPmMgPerKgFuel: 90,
-    sources: ["RAM_SPEC", "RAM_AREA", "NHTSA", "NAP15", "WILLANS", "EPA_DRIVELINE", "EU_POWER", "EMEP_EURO_TIERS", "PHOTO_RAM"],
+    sources: ["RAM_SPEC", "RAM_AREA", "NHTSA", "NAP15", "WILLANS", "EPA_DRIVELINE", "EU_POWER", "TORQUE_CURVE", "SAE_J1349", "EMEP_EURO_TIERS", "PHOTO_RAM"],
   },
 };
 
@@ -531,7 +546,7 @@ const LEDGER = [
   ["Altitudes", "45 points EU-DEM 25 m, 578,1 à 1038,7 m", ["OTD"]],
   ["Virages", "Rayons déduits de la géométrie OSM; v = sqrt(a_lateral x R); cap maintenu sur la longueur d'arc R x angle", ["OSM", "CURVE"]],
   ["Limites de vitesse", "maxspeed OSM quand tagué; 50 km/h en ville; hypothèse 90 km/h hors ville", ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132"]],
-  ["Profil de vitesse montée", "v = min(v_curseur, v_limite, v_virage); accélération bornée par min(confort, P_max x eta_dt / v - F_resist); freinage borné par confort + g sin(theta)", ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132", "CURVE", "COMFORT", "EU_POWER"]],
+  ["Profil de vitesse montée", "v = min(v_curseur, v_limite, v_virage); accélération bornée par min(confort, F_dispo/m - F_resist) avec F_dispo = P_max(rho) x eta_dt / max(v, v_Pmax); freinage borné par confort + g sin(theta)", ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132", "CURVE", "COMFORT", "EU_POWER", "TORQUE_CURVE", "SAE_J1349"]],
   ["Descente en roue libre", "au-delà de v_curseur, pas de freinage tant que v < min(v_limite, v_virage)", ["DYN", "LEGIFRANCE", "LEGIFRANCE_R4132", "CURVE", "COMFORT"]],
   ["Bilan des forces", "F = m a + Crr(v) m g cos(theta) + 0,5 rho(h) Cd A v2 + m g sin(theta); Crr(v) = Crr0 (1 + (v/100)^2)", ["DYN", "MICHELIN_CRR"]],
   ["Conditions aux limites", "Vitesse nulle au départ (Super U), à l'arrivée (maison médicale) et au point de retournement (aller-retour)", []],
@@ -648,6 +663,7 @@ function getParams() {
     displacementL: vehicle.displacementL,
     exhaustPmMgPerKgFuel: vehicle.exhaustPmMgPerKgFuel,
     maxPowerW: vehicle.maxPowerW,
+    pmaxSpeedMps: vehicle.pmaxSpeedMps,
     latAccel: state.latAccel,
     longAccel: state.longAccel,
     coldStartSeconds: state.coldStart,
@@ -925,15 +941,18 @@ function coastingAcceleration(speedMps, a, b, params) {
 }
 
 // Maximum forward acceleration the powertrain can deliver at speed v on slope theta.
-// F_avail = P_max * eta_dt / v - F_resist; the comfort accel from the slider is then
-// clamped by this so heavy SUVs cannot accelerate uphill at the same rate as the Note.
-// See EU_POWER, EPA_DRIVELINE.
+// Force model: constant maximum torque below v_Pmax, constant power above. This avoids
+// the unphysical infinite force that P_max/v would imply at v -> 0. The peak power is
+// also derated by air density (naturally aspirated engines lose ~1 %/100 m). The comfort
+// accel from the slider is then clamped by this so heavy SUVs cannot accelerate uphill
+// at the same rate as the Note. See EU_POWER, EPA_DRIVELINE, TORQUE_CURVE, SAE_J1349.
 function poweredAccel(params, speedMps, theta, rho) {
   const v = Math.max(speedMps, kmhToMps(5));
   const fRoll = effectiveCrr(params.crr, v) * params.mass * CONSTANTS.g * Math.cos(theta);
   const fAero = 0.5 * rho * params.cd * params.area * v * v;
   const fGrade = params.mass * CONSTANTS.g * Math.sin(theta);
-  const fAvail = (params.maxPowerW * CONSTANTS.drivetrainEfficiency) / v;
+  const pAvail = params.maxPowerW * CONSTANTS.drivetrainEfficiency * (rho / CONSTANTS.rho0);
+  const fAvail = pAvail / Math.max(params.pmaxSpeedMps || 30, v);
   return (fAvail - fRoll - fAero - fGrade) / params.mass;
 }
 
