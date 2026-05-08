@@ -60,6 +60,12 @@ const SOURCES = [
     note: "Coefficient de résistance au roulement Crr=0,009 repris pour les profils véhicules.",
   },
   {
+    id: "MICHELIN_CRR",
+    title: "Michelin, Tire rolling resistance and fuel economy",
+    url: "https://www.michelin.com/en/innovation/tire-environment/tire-rolling-resistance/",
+    note: "Le coefficient de résistance au roulement augmente avec la vitesse, approximé par Crr(v) = Crr0 (1 + (v/30 m/s)^2).",
+  },
+  {
     id: "BEDDOWS",
     title: "Beddows & Harrison, Atmospheric Environment 2021",
     url: "https://research.birmingham.ac.uk/en/publications/pmsub10sub-and-pmsub25sub-emission-factors-for-non-exhaust-partic",
@@ -450,6 +456,8 @@ const CONSTANTS = {
   // Engine-brake force F_eb = k * cylindree[L] * v[m/s]. k calibré pour donner ~0,3 m/s2
   // de décélération supplémentaire à 25 m/s sur la 1,4 L de la Note. See ENGINE_BRAKE.
   engineBrakeNPerLPerMps: 10,
+  // Speed-dependent rolling resistance: Crr(v) = Crr0 (1 + (v / v_ref)^2). See MICHELIN_CRR.
+  crrSpeedRefMps: 30,
   tyrePM10: 0.6,
   tyrePM25: 0.42,
   brakePM10: 0.98,
@@ -504,7 +512,8 @@ const LEDGER = [
   ["Limites de vitesse", "maxspeed OSM quand tagué; 50 km/h en ville; hypothèse 90 km/h hors ville", ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132"]],
   ["Profil de vitesse montée", "v = min(v_curseur, v_limite, v_virage); accélération bornée par min(confort, P_max x eta_dt / v - F_resist); freinage borné par confort + g sin(theta)", ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132", "CURVE", "COMFORT", "EU_POWER"]],
   ["Descente en roue libre", "au-delà de v_curseur, pas de freinage tant que v < min(v_limite, v_virage)", ["DYN", "LEGIFRANCE", "LEGIFRANCE_R4132", "CURVE", "COMFORT"]],
-  ["Bilan des forces", "F = m a + Crr m g cos(theta) + 0,5 rho Cd A v2 + m g sin(theta)", ["DYN"]],
+  ["Bilan des forces", "F = m a + Crr(v) m g cos(theta) + 0,5 rho(h) Cd A v2 + m g sin(theta); Crr(v) = Crr0 (1 + (v/30)^2)", ["DYN", "MICHELIN_CRR"]],
+  ["Conditions aux limites", "Vitesse nulle au départ (Super U), à l'arrivée (maison médicale) et au point de retournement (aller-retour)", []],
   ["Cinématique freinage", "v2 = v0 2 + 2 a s", ["DYN", "COMFORT"]],
   ["Véhicule Nissan Note", "m=1118 kg; Cd=0,30; A=2,25 m2; Crr=0,009; cyl. 1,4 L", ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15"]],
   ["Véhicule BMW X5 4.8is", "m=2275 kg; Cd=0,38; A=2,74 m2; Crr=0,009; cyl. 4,8 L", ["X5_SPEC", "NHTSA", "NAP15"]],
@@ -774,6 +783,20 @@ function buildSpeedProfile(targetKmh, params, route, n) {
     });
   }
 
+  // Vehicle starts at the Super U car park, ends at the maison médicale, and (round trip)
+  // halts at the turnaround. Anchoring v=0 here lets the kinematic passes ramp the speeds
+  // to and from rest with the launch fuel and brake events the cruise-only model missed.
+  points[0].speedMps = 0;
+  points[points.length - 1].speedMps = 0;
+  if (route.direction === "round") {
+    const midM = ROUTE.distanceM;
+    let nearest = 0;
+    for (let i = 1; i < points.length; i += 1) {
+      if (Math.abs(points[i].m - midM) < Math.abs(points[nearest].m - midM)) nearest = i;
+    }
+    points[nearest].speedMps = 0;
+  }
+
   // Forward pass: accel is min(comfort, engine-limited at this slope and speed). Heavy
   // vehicles cannot match the comfort target uphill at high v. See EU_POWER.
   for (let i = 1; i < points.length; i += 1) {
@@ -806,6 +829,10 @@ function buildSpeedProfile(targetKmh, params, route, n) {
   return points;
 }
 
+// On a descent the cruise slider acts as a soft cap: the car coasts above it but powers
+// up to it when coasting drag would slow the car below. Curve and limit caps were already
+// pre-applied by the backward pass in buildSpeedProfile, so the Math.min below preserves
+// them — do not "fix" by removing the clamp. See DYN.
 function applyCoastingDescentProfile(capPoints, targetMps, params) {
   const minSpeed = kmhToMps(5);
   const points = capPoints.map((point) => ({ ...point }));
@@ -836,7 +863,7 @@ function coastingAcceleration(speedMps, a, b, params) {
   const theta = Math.atan2(dh, ds);
   const speed = Math.max(speedMps, kmhToMps(3));
   const rho = airDensity((a.elev + b.elev) / 2);
-  const fRoll = params.crr * params.mass * CONSTANTS.g * Math.cos(theta);
+  const fRoll = effectiveCrr(params.crr, speed) * params.mass * CONSTANTS.g * Math.cos(theta);
   const fAero = 0.5 * rho * params.cd * params.area * speed * speed;
   const fGrade = params.mass * CONSTANTS.g * Math.sin(theta);
   return -(fRoll + fAero + fGrade) / params.mass;
@@ -848,7 +875,7 @@ function coastingAcceleration(speedMps, a, b, params) {
 // See EU_POWER, EPA_DRIVELINE.
 function poweredAccel(params, speedMps, theta, rho) {
   const v = Math.max(speedMps, kmhToMps(5));
-  const fRoll = params.crr * params.mass * CONSTANTS.g * Math.cos(theta);
+  const fRoll = effectiveCrr(params.crr, v) * params.mass * CONSTANTS.g * Math.cos(theta);
   const fAero = 0.5 * rho * params.cd * params.area * v * v;
   const fGrade = params.mass * CONSTANTS.g * Math.sin(theta);
   const fAvail = (params.maxPowerW * CONSTANTS.drivetrainEfficiency) / v;
@@ -891,7 +918,7 @@ function simulate(targetKmh, params, route) {
     const acc = (b.speedMps * b.speedMps - a.speedMps * a.speedMps) / (2 * ds);
 
     const rho = airDensity((a.elev + b.elev) / 2);
-    const fRoll = params.crr * params.mass * CONSTANTS.g * Math.cos(theta);
+    const fRoll = effectiveCrr(params.crr, vAvg) * params.mass * CONSTANTS.g * Math.cos(theta);
     const fAero = 0.5 * rho * params.cd * params.area * vAvg * vAvg;
     const fGrade = params.mass * CONSTANTS.g * Math.sin(theta);
     const fInertia = params.mass * acc;
@@ -1012,6 +1039,12 @@ function kmhToMps(kmh) {
 // See ISA_DENSITY.
 function airDensity(elevM) {
   return CONSTANTS.rho0 * Math.pow(1 - CONSTANTS.isaLapse * elevM, CONSTANTS.isaExp);
+}
+
+// Crr grows quadratically with speed; matters above ~70 km/h. See MICHELIN_CRR.
+function effectiveCrr(crr0, speedMps) {
+  const r = speedMps / CONSTANTS.crrSpeedRefMps;
+  return crr0 * (1 + r * r);
 }
 
 function renderRouteFacts(route) {

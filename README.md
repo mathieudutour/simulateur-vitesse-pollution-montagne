@@ -9,7 +9,14 @@ Ouvrir `index.html` dans un navigateur. Aucune dépendance n'est requise.
 
 Le modèle est volontairement transparent:
 
-- les forces longitudinales viennent d'un bilan physique véhicule-route;
+- les forces longitudinales viennent d'un bilan physique véhicule-route, avec
+  résistance au roulement croissant en (v/30 m/s)^2 et densité de l'air corrigée
+  par l'altitude;
+- le véhicule part et arrive à l'arrêt (Super U, maison médicale) et s'arrête au
+  point de retournement en aller-retour;
+- l'accélération est plafonnée par la puissance moteur disponible (P_max x rendement
+  de transmission), donc un véhicule lourd ne peut pas suivre la même rampe qu'une
+  citadine en montée;
 - les profils véhicules remplacent les réglages techniques: Nissan Note 2013,
   BMW X5 4.8is 2004, Dodge Ram 1500 SLT/TRX4 2007;
 - le profil de vitesse est plafonné par les limites OSM taguées, par 50 km/h en ville,
