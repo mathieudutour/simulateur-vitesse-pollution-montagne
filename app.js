@@ -453,6 +453,7 @@ const DEFAULTS = {
   payload: 75,        // single driver mass; added on top of curb mass
   parkingIdle: 30,    // s of engine-on idle at each v=0 anchor (departure, arrival, turnaround)
   fuelPrice: 1.989,   // user-overrideable; default = SP95-E10 Super U Passy 25/03/2026
+  twoTrips: false,    // round trip = two separate trips (engine cools at turnaround)
 };
 
 const CONSTANTS = {
@@ -605,6 +606,15 @@ if (typeof document !== "undefined") document.addEventListener("DOMContentLoaded
     });
   });
 
+  const twoTripsEl = document.getElementById("twoTrips");
+  if (twoTripsEl) {
+    twoTripsEl.checked = state.twoTrips;
+    twoTripsEl.addEventListener("change", () => {
+      state.twoTrips = twoTripsEl.checked;
+      update();
+    });
+  }
+
   document.querySelectorAll("[data-vehicle]").forEach((button) => {
     button.addEventListener("click", () => {
       state.vehicleId = button.dataset.vehicle;
@@ -628,6 +638,7 @@ if (typeof document !== "undefined") document.addEventListener("DOMContentLoaded
     Object.entries(DEFAULTS).forEach(([key, value]) => {
       if (els[key]) els[key].value = value;
     });
+    if (twoTripsEl) twoTripsEl.checked = state.twoTrips;
     document.querySelectorAll("[data-direction]").forEach((button) => {
       button.classList.toggle("is-active", button.dataset.direction === state.direction);
     });
@@ -692,6 +703,7 @@ function getParams() {
     coldStartSeconds: state.coldStart,
     parkingIdleSeconds: state.parkingIdle,
     fuelPriceEurPerL: state.fuelPrice,
+    twoTrips: state.twoTrips,
   };
 }
 
@@ -1054,7 +1066,13 @@ function simulate(targetKmh, params, route) {
   // surcharge by ~5x for trips longer than a few minutes. See WILLANS, COLD_START.
   let warmFuelL = 0;
   let coldWindowFuelL = 0;
-  const coldEndS = params.coldStartSeconds || 0;
+  // The "deux trajets séparés" toggle doubles the cold window for round trips: the
+  // engine cools at the turnaround, so the descent leg gets its own catalyst light-off.
+  // The doubling is applied to the *single* window length so it still integrates the
+  // launch's high fuel rate correctly (there's no second "launch" — just a longer cold
+  // window — but for trip totals the two are interchangeable).
+  const tripCountForColdStart = (route.direction === "round" && params.twoTrips) ? 2 : 1;
+  const coldEndS = tripCountForColdStart * (params.coldStartSeconds || 0);
   const fuelDensityKgL = CONSTANTS.gasolineDensityKgPerL;
   const idleRateLPerS = (CONSTANTS.idleFuelGPerSPerL * params.displacementL) / (fuelDensityKgL * 1000);
   const fuelLhvJ = CONSTANTS.gasolineLhvMJPerL * 1e6;
@@ -1177,13 +1195,20 @@ function simulate(targetKmh, params, route) {
   const coldMultiplier = (1 - coldFractionByFuel) + coldFractionByFuel * 1.30 * 7;
   const exhaustPmMg = warmFuelKg * params.exhaustPmMgPerKgFuel * coldMultiplier;
 
-  // Each segment's PM10 = energy_J x 1e-6 x brakeTspGPerMJ x brakePM10. Equivalent to
-  // (energy / total) x total but avoids the divide-by-zero guard. See HAGINO.
+  // Each segment's PM10 = energy_J x 1e-6 x brakeTspGPerMJ x brakePM10 (and similarly
+  // PM2.5). Equivalent to (energy / total) x total but avoids the divide-by-zero guard.
+  // See HAGINO.
   const brakeTotalPm10Mg = brakeTsp * CONSTANTS.brakePM10 * 1000;
-  const brakePmHotspots = brakeBySegment.map((row) => ({
-    km: row.km,
-    mg: (row.energyJ / 1e6) * CONSTANTS.brakeTspGPerMJ * CONSTANTS.brakePM10 * 1000,
-  }));
+  const brakeTotalPm25Mg = brakeTsp * CONSTANTS.brakePM25 * 1000;
+  const brakePmHotspots = brakeBySegment.map((row) => {
+    const tspMg = (row.energyJ / 1e6) * CONSTANTS.brakeTspGPerMJ * 1000;
+    return {
+      km: row.km,
+      mg: tspMg * CONSTANTS.brakePM10,        // PM10, kept as `mg` for hotspot map back-compat
+      pm10Mg: tspMg * CONSTANTS.brakePM10,
+      pm25Mg: tspMg * CONSTANTS.brakePM25,
+    };
+  });
 
   return {
     targetKmh,
@@ -1209,6 +1234,7 @@ function simulate(targetKmh, params, route) {
     totalPm25Mg: pm25G * 1000 + exhaustPmMg,
     tyrePm10Mg: tyreTsp * CONSTANTS.tyrePM10 * 1000,
     brakePm10Mg: brakeTotalPm10Mg,
+    brakePm25Mg: brakeTotalPm25Mg,
     roadPm10Mg: roadTsp * CONSTANTS.roadPM10 * 1000,
     brakePmHotspots,
     powerLimitedKm: powerLimitedDistanceM / 1000,

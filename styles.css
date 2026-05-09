@@ -366,6 +366,17 @@ h3 {
   accent-color: var(--green);
 }
 
+.control-checkbox {
+  grid-template-columns: 1fr auto;
+}
+
+.control-checkbox input[type="checkbox"] {
+  grid-column: auto;
+  width: auto;
+  justify-self: end;
+  accent-color: var(--green);
+}
+
 .control-b span,
 .control-b output {
   color: var(--blue);
