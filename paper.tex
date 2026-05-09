@@ -172,9 +172,11 @@ combustion factor of \SI{2.21}{kg/L}~\cite{ademe2023}.
 A cold-start window of $T_{\text{cs}}$ seconds (default \SI{60}{s},
 user-controlled) applies a $+30\,\%$ fuel surcharge and a
 $\times 7$ catalyst-light-off PM penalty to the fraction of fuel
-burned during the first $T_{\text{cs}}$ seconds (doubled for round
-trips since the engine cools at the turnaround), per Weilenmann
-\textit{et al.}~\cite{weilenmann2009}.
+burned during the first $T_{\text{cs}}$ seconds, per Weilenmann
+\textit{et al.}~\cite{weilenmann2009}. The default trip is treated
+as a single continuous outing (the engine remains warm during the
+brief stop at the medical centre); a user wanting to model two
+separate cold starts can double the slider value.
 
 \subsection{Tailpipe PM}
 

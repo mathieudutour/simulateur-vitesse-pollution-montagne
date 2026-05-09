@@ -206,7 +206,7 @@ lines.push("");
 // diagnostic does discriminate between vehicles even though it is silent on the Note.
 lines.push("## Distance « moteur saturé » par véhicule");
 lines.push("");
-lines.push("Le diagnostic n'est pas activé pour la Nissan Note ; il l'est pour les profils plus lourds, ce qui justifie son intérêt en présence d'une montée soutenue.");
+lines.push("La saturation suit le rapport puissance/masse: la Nissan Note (58 W/kg) ne tient pas la consigne de confort sur la montée, le BMW X5 (118 W/kg) et le Dodge Ram (107 W/kg) en ont les moyens. C'est l'inverse de l'intuition « c'est le pick-up qui peine ».");
 lines.push("");
 lines.push("| Véhicule | 50 km/h (km) | 90 km/h (km) | Δ (km) |");
 lines.push("|---|---:|---:|---:|");
@@ -223,7 +223,7 @@ lines.push("## Méthode");
 lines.push("");
 lines.push("1. Pour chaque paramètre, deux simulations sont relancées : une à `p × 0,75` et une à `p × 1,25`.");
 lines.push("2. Pour chaque grandeur Δ_X = X_90 − X_50, on calcule l'élasticité normalisée définie en tête.");
-lines.push("3. La distance « moteur saturé » est presque toujours dégénérée à zéro pour la Note (le moteur tient sa vitesse partout) et n'est donc pas un test discriminant ici.");
+lines.push("3. La distance « moteur saturé » mesure la longueur des segments en montée où la puissance disponible ne couvre pas la consigne de confort longAccel. Elle est donc maximale pour la voiture la moins puissante (la Note) et faible pour les SUV/pick-up.");
 lines.push("");
 lines.push(`Reproduire : \`node sensitivity.js\` à la racine du dépôt.`);
 lines.push("");

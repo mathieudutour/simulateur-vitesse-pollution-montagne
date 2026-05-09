@@ -63,7 +63,7 @@ const SOURCES = [
     id: "MICHELIN_CRR",
     title: "Michelin, Tire rolling resistance and fuel economy",
     url: "https://www.michelin.com/en/innovation/tire-environment/tire-rolling-resistance/",
-    note: "Le coefficient de résistance au roulement augmente avec la vitesse, approximé par Crr(v) = Crr0 (1 + (v/30 m/s)^2).",
+    note: "Le coefficient de résistance au roulement augmente avec la vitesse. Approximation utilisée: Crr(v) = Crr0 (1 + (v/100 m/s)^2), calibrée pour reproduire le rapport ISO 28580 / Michelin Crr(130 km/h)/Crr(50 km/h) ~1,10. v_ref = 100 m/s -> ratio 1,13 à 130 km/h, 1,04 à 50 km/h.",
   },
   {
     id: "BEDDOWS",
@@ -555,8 +555,8 @@ const LEDGER = [
   ["Véhicule BMW X5 4.8is", "m=2275 kg; Cd=0,38; A=2,74 m2; Crr=0,009; cyl. 4,8 L", ["X5_SPEC", "NHTSA", "NAP15"]],
   ["Véhicule Dodge Ram 1500", "m=2366 kg; Cd=0,53; A=3,31 m2; Crr=0,009; cyl. 5,7 L", ["RAM_SPEC", "RAM_AREA", "NHTSA", "NAP15"]],
   ["Carburant moteur", "Carburant = (E_roue / 0,85 / 0,40) / PCI + 0,21 g/s/L cylindrée x t_DFCO_off", ["WILLANS", "EPA_DRIVELINE", "IDLE_FUEL", "NAP15", "DOE"]],
-  ["Démarrage à froid", "Budget +30 % carburant et x7 PM échappement pro rata sur les coldStart premières secondes; aller-retour = 2 démarrages (moteur refroidit au point de retournement); curseur dans Avancé, désactivable à 0", ["EMEP_EXHAUST", "COLD_START"]],
-  ["Profil aller-retour", "Aller-retour = montée à plafond ferme (identique au sens 'up') + descente en roue libre; deux démarrages à froid", ["DYN", "COMFORT", "COLD_START"]],
+  ["Démarrage à froid", "Budget +30 % carburant et x7 PM échappement pro rata sur les coldStart premières secondes; un seul démarrage par simulation (un aller-retour continu garde le moteur chaud); curseur dans Avancé, désactivable à 0", ["EMEP_EXHAUST", "COLD_START"]],
+  ["Profil aller-retour", "Aller-retour = montée à plafond ferme (identique au sens 'up') + descente en roue libre; un seul démarrage à froid", ["DYN", "COMFORT", "COLD_START"]],
   ["Air et gravité", "rho(h) = 1,225 (1 - 2,2557e-5 h)^4,2559 kg/m3; g = 9,80665 m/s2", ["ISA", "ISA_DENSITY"]],
   ["Essence", "PCI = 31,82 MJ/L, dérivé de 112114-116090 Btu/gal", ["DOE"]],
   ["Prix essence Super U", "SP95-E10 = 1,989 €/L; flux consulté le 06/05/2026, dernier relevé station du 25/03/2026 09:38", ["FUELPRICE", "SUPERU"]],
@@ -788,20 +788,28 @@ function reverseSpeedLimits(limits, totalKm) {
 function buildSpeedProfile(targetKmh, params, route, n) {
   const targetMps = kmhToMps(targetKmh);
   const minSpeed = kmhToMps(5);
-  const cruiseIsHardCap = route.direction === "up";
+  const oneWayM = ROUTE.distanceM;
+  // Hard cap means the cruise slider is enforced as an upper bound during the climb;
+  // soft cap (the descent coasting profile) lets the car coast above it. A round trip
+  // is climb-then-descent, so the climb half (m < oneWayM) is hard-capped, the descent
+  // half is soft-capped — same physics as picking "up" then "down" separately.
+  const isHardCapAt = (m) => (
+    route.direction === "up"
+    || (route.direction === "round" && m <= oneWayM)
+  );
   const points = [];
 
   for (let i = 0; i <= n; i += 1) {
     const m = (route.distanceM * i) / n;
     const km = m / 1000;
     const speedLimitMps = kmhToMps(speedLimitAt(route, km));
-    let speedMps = cruiseIsHardCap ? Math.min(targetMps, speedLimitMps) : speedLimitMps;
+    let speedMps = isHardCapAt(m) ? Math.min(targetMps, speedLimitMps) : speedLimitMps;
 
     route.curves.forEach((curve) => {
       const curveM = curve.km * 1000;
       const curveSpeedLimitMps = kmhToMps(speedLimitAt(route, curve.km));
       const curveCap = Math.min(
-        cruiseIsHardCap ? targetMps : Number.POSITIVE_INFINITY,
+        isHardCapAt(curveM) ? targetMps : Number.POSITIVE_INFINITY,
         curveSpeedLimitMps,
         Math.sqrt(params.latAccel * curve.radiusM),
       );
@@ -870,10 +878,10 @@ function buildSpeedProfile(targetKmh, params, route, n) {
     points[i].speedMps = Math.min(points[i].speedMps, brakeLimit);
   }
 
-  if (cruiseIsHardCap) return points;
+  if (route.direction === "up") return points;
 
   // Descent or round trip: apply the coasting profile only to the descent half. For a
-  // round trip, the uphill leg stays under the hard cap from the forward pass — same
+  // round trip, the uphill leg stays under the hard cap from isHardCapAt above — same
   // physics as picking the dedicated "up" direction. The descent leg starts at the
   // turnaround point, where the speed was anchored to 0 above.
   const coastStartIdx = route.direction === "round"
@@ -979,9 +987,10 @@ function simulate(targetKmh, params, route) {
   // Idle fuel still flows whenever the engine is not in deceleration fuel-cut: at low
   // speed (below DFCO threshold) or when the wheels are pulling. See IDLE_FUEL.
   let idleSecondsS = 0;
-  // Diagnostic: distance over which the engine cannot produce positive acceleration at
-  // the local slope and speed (poweredAccel < 0). Useful when comparing heavy vehicles
-  // on the steeper segments of the route. See EU_POWER, TORQUE_CURVE.
+  // Diagnostic: distance over which the engine is saturated relative to the comfort
+  // target, i.e. poweredAccel < longAccel. This is the same threshold the forward pass
+  // uses to bind acceleration, so the count matches what the speed profile actually
+  // experienced. See EU_POWER, TORQUE_CURVE.
   let powerLimitedDistanceM = 0;
   const brakeBySegment = [];
 
@@ -1006,7 +1015,12 @@ function simulate(targetKmh, params, route) {
     const fInertia = params.mass * acc;
     const fWheel = fRoll + fAero + fGrade + fInertia;
     const dt = ds / vAvg;
-    if (poweredAccel(params, vAvg, theta, rho) < 0) powerLimitedDistanceM += ds;
+    // Only count uphill segments. On flat or descent the engine doesn't need to match
+    // longAccel (no positive grade to overcome), so reporting them as "saturated" would
+    // include normal cruise. The diagnostic is meant to flag steep climbs.
+    if (theta > 0 && poweredAccel(params, vAvg, theta, rho) < params.longAccel) {
+      powerLimitedDistanceM += ds;
+    }
 
     // When wheels pull (fWheel > 0), engine drives the car. When wheels overrun the engine
     // (fWheel < 0), some of the deceleration is absorbed by the engine itself (pumping +
@@ -1042,12 +1056,11 @@ function simulate(targetKmh, params, route) {
   const warmFuelL = tractionFuelL + idleFuelL;
   // Cold-start budget: SI gasoline burns ~30 % more fuel and emits ~7x exhaust PM until
   // catalyst light-off. Apply the budget pro rata to the first coldStartSeconds of the
-  // trip; setting the slider to 0 turns the budget off for warm-engine comparisons.
-  // A round trip has two cold starts (engine cools at the turnaround), so the cold
-  // window is doubled. See COLD_START.
-  const coldStartCount = route.direction === "round" ? 2 : 1;
-  const coldWindowS = coldStartCount * (params.coldStartSeconds || 0);
-  const coldFraction = Math.min(1, coldWindowS / Math.max(timeS, 1));
+  // trip. A continuous round trip (brief stop at the maison médicale) keeps the engine
+  // warm, so a single cold start is applied; a user wanting to model two separate cold
+  // starts can simply set the slider to twice the catalyst light-off duration. Setting
+  // the slider to 0 turns the budget off for warm-engine comparisons. See COLD_START.
+  const coldFraction = Math.min(1, (params.coldStartSeconds || 0) / Math.max(timeS, 1));
   const coldStartFuelL = coldFraction * warmFuelL * 0.30;
   const fuelL = warmFuelL + coldStartFuelL;
   const fuelCostEur = fuelL * CONSTANTS.fuelPriceEurPerL;
@@ -1140,7 +1153,8 @@ function airDensity(elevM) {
   return CONSTANTS.rho0 * Math.pow(1 - CONSTANTS.isaLapse * elevM, CONSTANTS.isaExp);
 }
 
-// Crr grows quadratically with speed; matters above ~70 km/h. See MICHELIN_CRR.
+// Crr grows quadratically with speed: Crr(v) = Crr0 (1 + (v/v_ref)^2) with
+// v_ref = crrSpeedRefMps. See MICHELIN_CRR.
 function effectiveCrr(crr0, speedMps) {
   const r = speedMps / CONSTANTS.crrSpeedRefMps;
   return crr0 * (1 + r * r);
@@ -1207,7 +1221,7 @@ function renderMetrics(a, b) {
     ["PM2,5 hors échappement", "pm25Mg", " mg", 0, true, ["EMEP", "BEDDOWS", "BRAKE", ...speedRefs, ...vehicleRefs], "Fractions PM2,5 appliquées aux émissions hors échappement."],
     ["Temps", "timeMin", " min", 1, true, ["OSM", "LEGIFRANCE", "CURVE", "COMFORT"], "Distance segmentée divisée par le profil de vitesse plafonné par les limites locales.", "absolute"],
     ["Vitesse moyenne", "avgKmh", " km/h", 1, false, ["OSM", "LEGIFRANCE", "CURVE", "COMFORT"], "Distance routière divisée par le temps simulé."],
-    ["Distance moteur saturé", "powerLimitedKm", " km", 2, true, ["EU_POWER", "TORQUE_CURVE", "SAE_J1349", ...vehicleRefs], "Distance sur laquelle le moteur ne peut pas accélérer au régime de pente local (poweredAccel < 0); diagnostic des montées soutenues.", "absolute"],
+    ["Distance moteur saturé", "powerLimitedKm", " km", 2, true, ["EU_POWER", "TORQUE_CURVE", "SAE_J1349", ...vehicleRefs], "Distance sur laquelle le moteur ne peut pas tenir la consigne de confort (poweredAccel < longAccel); diagnostic des montées soutenues.", "absolute"],
   ];
 
   document.getElementById("metrics").innerHTML = rows
