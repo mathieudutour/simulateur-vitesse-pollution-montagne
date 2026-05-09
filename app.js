@@ -105,7 +105,7 @@ const SOURCES = [
     id: "IDLE_FUEL",
     title: "Argonne / SAE 2014-01-1147, gasoline idle fuel rate",
     url: "https://www.sae.org/publications/technical-papers/content/2014-01-1147/",
-    note: "Consommation au ralenti d'un moteur essence 1,4-1,6 L environ 0,30 g/s; sert de plancher de carburant et de base pour le scaling cylindrée.",
+    note: "Consommation au ralenti d'un moteur essence 1,4-1,6 L environ 0,30 g/s; le simulateur utilise k_idle = 0,21 g/s/L de cylindrée (calé pour reproduire les ~0,30 g/s d'une 1,4 L). Appliqué (a) à chaque pas de temps hors DFCO et (b) en bloc à chaque arrêt v=0 (ralenti à l'arrêt, n_anchors x parkingIdle).",
   },
   {
     id: "DOE",
@@ -165,7 +165,7 @@ const SOURCES = [
     id: "COLD_START",
     title: "Weilenmann, Favez & Alvarez, Atmospheric Environment 2009",
     url: "https://doi.org/10.1016/j.atmosenv.2009.01.005",
-    note: "Surconsommation et surémissions au démarrage à froid d'un véhicule essence: ~+30 % carburant et environ x7 PM échappement durant l'amorçage du catalyseur (60-90 s).",
+    note: "Surconsommation et surémissions au démarrage à froid d'un véhicule essence: ~+30 % carburant et environ x7 PM échappement durant l'amorçage du catalyseur (60-90 s). Le simulateur intègre le carburant brûlé pendant les T_cs premières secondes (au régime instantané, pas pro rata du temps), puis surcharge fuel = 0,30 x carburant_intégré et PM = facteur x masse_carburant x [(1-f) + f x 1,30 x 7] avec f = part du carburant brûlée dans la fenêtre.",
   },
   {
     id: "BRAKE",
@@ -567,21 +567,21 @@ const LEDGER = [
   ["Véhicule Nissan Note", "m=1118 kg; Cd=0,30; A=2,25 m2; Crr=0,009; cyl. 1,4 L", ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15"]],
   ["Véhicule BMW X5 4.8is", "m=2275 kg; Cd=0,38; A=2,74 m2; Crr=0,009; cyl. 4,8 L", ["X5_SPEC", "NHTSA", "NAP15"]],
   ["Véhicule Dodge Ram 1500", "m=2366 kg; Cd=0,53; A=3,31 m2; Crr=0,009; cyl. 5,7 L", ["RAM_SPEC", "RAM_AREA", "NHTSA", "NAP15"]],
-  ["Carburant moteur", "Carburant = (E_roue / 0,85 / 0,40) / PCI + 0,21 g/s/L cylindrée x t_DFCO_off; intégré par segment", ["WILLANS", "EPA_DRIVELINE", "IDLE_FUEL", "NAP15", "DOE"]],
-  ["Charge utile", "Masse effective = masse à vide véhicule + charge utile (curseur Avancé, défaut 75 kg = un conducteur)", ["AUTOEVO", "X5_SPEC", "RAM_SPEC"]],
-  ["Ralenti à l'arrêt", "Curseur Avancé: temps de ralenti par point d'arrêt (départ, arrivée, demi-tour aller-retour). Ajoute du carburant ralenti et du temps, sans travail mécanique", ["IDLE_FUEL"]],
-  ["Démarrage à froid", "Budget +30 % carburant et x7 PM échappement, intégré sur la fenêtre coldStart (le carburant est compté au régime instantané, pas pro rata du temps); un seul démarrage par simulation (un aller-retour continu garde le moteur chaud); curseur dans Avancé, désactivable à 0", ["EMEP_EXHAUST", "COLD_START"]],
-  ["Profil aller-retour", "Aller-retour = montée à plafond ferme (identique au sens 'up') + descente en roue libre; un seul démarrage à froid", ["DYN", "COMFORT", "COLD_START"]],
+  ["Carburant moteur", "Par segment: dF = max(F_roue,0) ds / (eta_dt eta_ind PCI) + (k_idle x cyl x dt) si moteur non en DFCO, avec eta_dt = 0,85, eta_ind = 0,40, k_idle = 0,21 g/s/L. F_total = somme des dF segments + ralenti à l'arrêt + démarrage à froid", ["WILLANS", "EPA_DRIVELINE", "IDLE_FUEL", "NAP15", "DOE"]],
+  ["Charge utile", "m_eff = m_à_vide + payload (curseur Avancé, défaut 75 kg = un conducteur). m_eff entre dans F_roll, F_grade, F_inertia et l'échelle massique des PM pneus / chaussée", ["AUTOEVO", "X5_SPEC", "RAM_SPEC"]],
+  ["Ralenti à l'arrêt", "Carburant_ralenti = n_anchors x parkingIdle x k_idle x cylindrée; n_anchors = 2 (sens unique) ou 3 (aller-retour: départ + demi-tour + arrivée). Ajoute du temps mais aucun travail aux roues. Curseur Avancé, défaut 30 s", ["IDLE_FUEL"]],
+  ["Démarrage à froid", "Fenêtre froide T_cs (curseur Avancé, défaut 60 s; doublée si 'deux trajets séparés'). Carburant_froid = 0,30 x carburant_intégré_dans_T_cs (intégration au régime instantané, pas pro rata du temps). PM échappement = facteur_véhicule x masse_carburant x [(1 - f_carb_froid) + f_carb_froid x 1,30 x 7], avec f_carb_froid = part du carburant brûlée dans la fenêtre froide", ["EMEP_EXHAUST", "COLD_START"]],
+  ["Profil aller-retour", "Aller-retour = montée à plafond ferme (identique au sens 'up') + descente en roue libre; un seul démarrage à froid par défaut, deux si l'option 'Aller-retour = deux trajets séparés' est cochée dans Avancé", ["DYN", "COMFORT", "COLD_START"]],
   ["Air et gravité", "rho(h) = 1,225 (1 - 2,2557e-5 h)^4,2559 kg/m3; g = 9,80665 m/s2", ["ISA", "ISA_DENSITY"]],
-  ["Essence", "PCI = 31,82 MJ/L, dérivé de 112114-116090 Btu/gal", ["DOE"]],
-  ["Prix essence Super U", "SP95-E10 = 1,989 €/L; flux consulté le 06/05/2026, dernier relevé station du 25/03/2026 09:38", ["FUELPRICE", "SUPERU"]],
-  ["CO2 essence E10", "2,21 kg CO2/L SP95-E10 (ADEME Base Carbone, combustion TtW)", ["ADEME_E10"]],
-  ["Pneus", "TSP = 0,0107 g/km x m/m_Note; PM10/TSP = 0,60; PM2,5/TSP = 0,42", ["EMEP", "BEDDOWS"]],
-  ["Freins", "TSP = 0,0102 g/MJ x energie_plaquettes (post freinage moteur); PM10/TSP = 0,98; PM2,5/TSP = 0,39", ["HAGINO", "BRAKE", "EMEP"]],
-  ["Chaussée", "TSP = 0,0150 g/km x m/m_Note; PM10/TSP = 0,50; PM2,5/TSP = 0,27", ["EMEP", "BEDDOWS"]],
-  ["PM échappement essence", "PM = facteur véhicule x masse de carburant; 25 mg/kg (Note Euro 5), 90 mg/kg (Ram Tier 2), 120 mg/kg (X5 Euro 3); ajouté à PM10 total et PM2,5 total", ["EMEP_EXHAUST", "EMEP_TIER3", "EMEP_EURO_TIERS"]],
-  ["Freinage moteur", "F_eb = 10 N.s/(m.L) x cylindrée x v; soustrait du freinage avant calcul des PM", ["ENGINE_BRAKE"]],
-  ["Spatialisation freins", "PM frein local proportionnelle a l'energie de plaquettes du segment (apres freinage moteur)", ["HAGINO", "BRAKE"]],
+  ["Essence", "PCI = 31,82 MJ/L, dérivé de 112114-116090 Btu/gal; densité 0,745 kg/L", ["DOE"]],
+  ["Prix essence", "Carburant_cost = carburant x prix_curseur. Curseur Avancé, défaut 1,989 €/L (relevé station Super U Passy 25/03/2026 via flux prix-carburants.gouv.fr)", ["FUELPRICE", "SUPERU"]],
+  ["CO2 essence E10", "CO2 = carburant x 2,21 kg CO2/L (ADEME Base Carbone, combustion TtW; le surcoût démarrage à froid est inclus via carburant)", ["ADEME_E10"]],
+  ["Pneus", "TSP = 0,0107 g/km x m_eff/m_Note; PM10/TSP = 0,60; PM2,5/TSP = 0,42; échelle massique inclut la charge utile", ["EMEP", "BEDDOWS"]],
+  ["Freins", "TSP = 0,0102 g/MJ x energie_plaquettes (post freinage moteur, post inertie rotative); PM10/TSP = 0,98; PM2,5/TSP = 0,39", ["HAGINO", "BRAKE", "EMEP"]],
+  ["Chaussée", "TSP = 0,0150 g/km x m_eff/m_Note; PM10/TSP = 0,50; PM2,5/TSP = 0,27", ["EMEP", "BEDDOWS"]],
+  ["PM échappement essence", "PM = facteur_véhicule x masse_carburant_warm x multiplicateur_froid (cf. Démarrage à froid); facteurs: 25 mg/kg (Note Euro 5), 90 mg/kg (Ram Tier 2), 120 mg/kg (X5 Euro 3)", ["EMEP_EXHAUST", "EMEP_TIER3", "EMEP_EURO_TIERS"]],
+  ["Freinage moteur", "F_eb = 10 N.s/(m.L) x cylindrée x v; min(overrun, F_eb) absorbé par moteur (sans carburant si DFCO actif), residu -> freins de friction", ["ENGINE_BRAKE"]],
+  ["Spatialisation freins", "Par segment: PM10_local = E_plaquettes_segment / 1e6 x 0,0102 x 0,98 x 1000 (mg); PM2,5_local idem avec 0,39", ["HAGINO", "BRAKE"]],
 ];
 
 const els = {};
@@ -687,8 +687,11 @@ function syncOutputs() {
 function getParams() {
   const vehicle = VEHICLES[state.vehicleId] || VEHICLES.note;
   return {
-    // Effective mass = curb + payload. Affects every mass-scaled output (climb work,
-    // brake work, tyre/road PM via massScale).
+    // Effective mass m_eff = m_curb + payload (LEDGER row "Charge utile"). Used in:
+    //   F_roll  = Crr(v) m_eff g cos(theta)
+    //   F_grade = m_eff g sin(theta)
+    //   F_inertia = m_eff (1 + lambda) acc          [ROT_INERTIA]
+    //   tyre_PM, road_PM scale linearly via m_eff / m_Note  [BEDDOWS]
     mass: vehicle.mass + state.payload,
     curbMass: vehicle.mass,
     cd: vehicle.cd,
@@ -1061,21 +1064,29 @@ function simulate(targetKmh, params, route) {
   let inertiaJ = 0;
   let timeS = 0;
   // Per-segment fuel is accumulated directly so the cold-start window can integrate the
-  // *actual* fuel rate during the launch (which is 3-5x the trip mean) rather than a
-  // time pro-rata of the trip-mean rate. The pro-rata version under-counted cold-start
-  // surcharge by ~5x for trips longer than a few minutes. See WILLANS, COLD_START.
+  // *actual* fuel rate during the launch (which is 3-5x the trip mean on routes whose
+  // first km is the climb) rather than a time pro-rata of the trip-mean rate.
+  //
+  // Per-segment Willans formula (see LEDGER row "Carburant moteur"):
+  //   dF_segment = max(F_wheel, 0) ds / (eta_dt eta_ind PCI)
+  //              + (k_idle x cylindree x dt) [si non-DFCO]
+  //
+  // The cold-window accumulator uses the same dF, weighted by the share of dt that
+  // falls inside [0, coldEndS]. See WILLANS, IDLE_FUEL, COLD_START.
   let warmFuelL = 0;
   let coldWindowFuelL = 0;
   // The "deux trajets séparés" toggle doubles the cold window for round trips: the
   // engine cools at the turnaround, so the descent leg gets its own catalyst light-off.
   // The doubling is applied to the *single* window length so it still integrates the
   // launch's high fuel rate correctly (there's no second "launch" — just a longer cold
-  // window — but for trip totals the two are interchangeable).
+  // window — but for trip totals the two are interchangeable). See COLD_START.
   const tripCountForColdStart = (route.direction === "round" && params.twoTrips) ? 2 : 1;
   const coldEndS = tripCountForColdStart * (params.coldStartSeconds || 0);
   const fuelDensityKgL = CONSTANTS.gasolineDensityKgPerL;
+  // Idle fuel rate per second: k_idle [g/s/L] x cylindree [L] / density [g/L].
   const idleRateLPerS = (CONSTANTS.idleFuelGPerSPerL * params.displacementL) / (fuelDensityKgL * 1000);
   const fuelLhvJ = CONSTANTS.gasolineLhvMJPerL * 1e6;
+  // eta_dt x eta_ind x PCI: divisor that converts wheel work [J] to fuel volume [L].
   const fuelDivisor = CONSTANTS.drivetrainEfficiency * CONSTANTS.indicatedEfficiency * fuelLhvJ;
   let idleSecondsS = 0;
   const brakeBySegment = [];
@@ -1143,9 +1154,10 @@ function simulate(targetKmh, params, route) {
     });
   }
 
-  // Parking idle: engine on at v=0 anchors. One-way trip = 2 anchors (departure +
-  // arrival), round trip = 3 anchors (departure + turnaround + arrival). Adds idle
-  // fuel and time but no kinematic work. See IDLE_FUEL.
+  // Parking idle: engine on at v=0 anchors. Formula (LEDGER row "Ralenti à l'arrêt"):
+  //   carburant_ralenti = n_anchors x parkingIdle x k_idle x cylindree
+  // n_anchors = 2 (one-way: départ + arrivée) or 3 (aller-retour: départ + demi-tour
+  // + arrivée). Adds time too, but no kinematic work. See IDLE_FUEL.
   const idleAnchorCount = route.direction === "round" ? 3 : 2;
   const parkingIdleS = idleAnchorCount * (params.parkingIdleSeconds || 0);
   const parkingIdleFuelL = idleRateLPerS * parkingIdleS;
@@ -1186,11 +1198,18 @@ function simulate(targetKmh, params, route) {
     tyreTsp * CONSTANTS.tyrePM25 +
     brakeTsp * CONSTANTS.brakePM25 +
     roadTsp * CONSTANTS.roadPM25;
-  // Tier 3 EMEP: PM échappement proportionnel à la masse de carburant brûlée. Pendant
-  // la fenêtre démarrage à froid, le catalyseur n'est pas amorcé, donc *toute* la fuel
-  // brûlée durant ces secondes (baseline + surconsommation +30 %) émet ~7x plus de PM.
-  // Ne pondérer que la surconsommation par 7x (le bug initial) sous-évaluerait le total
-  // de ~20 %. See EMEP_TIER3, COLD_START.
+  // Tier 3 EMEP: PM échappement = facteur_véhicule x masse_carburant_warm.
+  // Pendant la fenêtre démarrage à froid, le catalyseur n'est pas amorcé, donc *toute*
+  // la fuel brûlée durant ces secondes (baseline + surconsommation +30 %) émet ~7x plus
+  // de PM. Formule:
+  //
+  //   exhaustPmMg = facteur_véhicule x masse_carburant_warm x mult_froid
+  //   mult_froid  = (1 - f_carb_froid) + f_carb_froid x 1,30 x 7
+  //   f_carb_froid = coldWindowFuelL / warmFuelL
+  //
+  // mult_froid = 1 quand f = 0 (moteur chaud), = 9,1 quand f = 1 (trip entièrement
+  // dans la fenêtre froide). Pondérer seulement la surconsommation par 7x (bug
+  // initial) sous-évaluerait le total de ~20 %. See EMEP_TIER3, COLD_START.
   const warmFuelKg = warmFuelL * CONSTANTS.gasolineDensityKgPerL;
   const coldMultiplier = (1 - coldFractionByFuel) + coldFractionByFuel * 1.30 * 7;
   const exhaustPmMg = warmFuelKg * params.exhaustPmMgPerKgFuel * coldMultiplier;
