@@ -855,15 +855,25 @@ function buildSpeedProfile(targetKmh, params, route, n) {
 
   // Forward pass: accel is min(comfort, engine-limited at this slope and speed). Heavy
   // vehicles cannot match the comfort target uphill at high v. See EU_POWER.
+  // powerLimitedM accumulates ds for segments where the engine cap actually lowered the
+  // next speed: poweredAccel < comfort AND the resulting cap is below what the curve
+  // / limit / slider had already set. A car cruising under a tight curve cap with low
+  // demand is therefore not flagged.
+  let powerLimitedM = 0;
   for (let i = 1; i < points.length; i += 1) {
     const a = points[i - 1];
     const b = points[i];
     const ds = b.m - a.m;
     const theta = Math.atan2(b.elev - a.elev, Math.max(ds, 0.1));
     const rho = airDensity((a.elev + b.elev) / 2);
-    const accelEff = Math.min(params.longAccel, poweredAccel(params, a.speedMps, theta, rho));
+    const aPowered = poweredAccel(params, a.speedMps, theta, rho);
+    const accelEff = Math.min(params.longAccel, aPowered);
     const accelLimit = Math.sqrt(Math.max(0, a.speedMps * a.speedMps + 2 * accelEff * ds));
-    points[i].speedMps = Math.min(points[i].speedMps, Math.max(minSpeed, accelLimit));
+    const cappedSpeed = Math.max(minSpeed, accelLimit);
+    if (aPowered < params.longAccel && cappedSpeed < points[i].speedMps - 1e-6) {
+      powerLimitedM += ds;
+    }
+    points[i].speedMps = Math.min(points[i].speedMps, cappedSpeed);
   }
 
   // Backward pass: comfort decel adjusted for slope (uphill braking is gravity-aided,
@@ -878,7 +888,7 @@ function buildSpeedProfile(targetKmh, params, route, n) {
     points[i].speedMps = Math.min(points[i].speedMps, brakeLimit);
   }
 
-  if (route.direction === "up") return points;
+  if (route.direction === "up") return { points, powerLimitedM };
 
   // Descent or round trip: apply the coasting profile only to the descent half. For a
   // round trip, the uphill leg stays under the hard cap from isHardCapAt above — same
@@ -887,7 +897,8 @@ function buildSpeedProfile(targetKmh, params, route, n) {
   const coastStartIdx = route.direction === "round"
     ? findIndexNearestM(points, ROUTE.distanceM)
     : 0;
-  return applyCoastingDescentProfile(points, targetMps, params, coastStartIdx);
+  const coastedPoints = applyCoastingDescentProfile(points, targetMps, params, coastStartIdx);
+  return { points: coastedPoints, powerLimitedM };
 }
 
 function findIndexNearestM(points, targetM) {
@@ -972,9 +983,18 @@ function speedLimitAt(route, km) {
 }
 
 function simulate(targetKmh, params, route) {
-  const n = 260;
+  // Segment count proportional to route length so a round trip uses the same ds as a
+  // one-way trip (~39 m). Otherwise n = 260 forced round trips into 79 m segments and
+  // accumulated discretization error: round trip stopped equaling up + down.
   const distanceM = route.distanceM;
-  const points = buildSpeedProfile(targetKmh, params, route, n);
+  const n = Math.max(2, Math.round(distanceM / 39.4));
+  const profile = buildSpeedProfile(targetKmh, params, route, n);
+  const points = profile.points;
+  // Diagnostic: distance over which the forward pass actually lowered the next speed
+  // because the engine cap (poweredAccel < comfort) was tighter than the curve / limit /
+  // slider cap. Cars cruising under a tight curve cap with low demand are not flagged.
+  // See EU_POWER, TORQUE_CURVE.
+  const powerLimitedDistanceM = profile.powerLimitedM;
 
   let tractionJ = 0;
   let brakeJ = 0;        // friction-brake (pad) work only, after engine-brake share is removed
@@ -987,11 +1007,6 @@ function simulate(targetKmh, params, route) {
   // Idle fuel still flows whenever the engine is not in deceleration fuel-cut: at low
   // speed (below DFCO threshold) or when the wheels are pulling. See IDLE_FUEL.
   let idleSecondsS = 0;
-  // Diagnostic: distance over which the engine is saturated relative to the comfort
-  // target, i.e. poweredAccel < longAccel. This is the same threshold the forward pass
-  // uses to bind acceleration, so the count matches what the speed profile actually
-  // experienced. See EU_POWER, TORQUE_CURVE.
-  let powerLimitedDistanceM = 0;
   const brakeBySegment = [];
 
   for (let i = 0; i < n; i += 1) {
@@ -1015,12 +1030,6 @@ function simulate(targetKmh, params, route) {
     const fInertia = params.mass * acc;
     const fWheel = fRoll + fAero + fGrade + fInertia;
     const dt = ds / vAvg;
-    // Only count uphill segments. On flat or descent the engine doesn't need to match
-    // longAccel (no positive grade to overcome), so reporting them as "saturated" would
-    // include normal cruise. The diagnostic is meant to flag steep climbs.
-    if (theta > 0 && poweredAccel(params, vAvg, theta, rho) < params.longAccel) {
-      powerLimitedDistanceM += ds;
-    }
 
     // When wheels pull (fWheel > 0), engine drives the car. When wheels overrun the engine
     // (fWheel < 0), some of the deceleration is absorbed by the engine itself (pumping +

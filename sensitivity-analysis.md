@@ -8,30 +8,30 @@ Configuration : véhicule Nissan Note, sens « round », 50 km/h vs 90 km/h, dé
 
 | Grandeur | Δ(90 − 50) | Unité |
 |---|---:|---|
-| Carburant | 0.163 | L |
-| Temps | -2.190 | min |
-| CO2 | 0.359 | kg |
-| PM10 total | 20.128 | mg |
-| PM2,5 total | 10.704 | mg |
-| Énergie freins | 0.435 | kWh |
-| Distance moteur saturé | 0.000 | km |
+| Carburant | 0.162 | L |
+| Temps | -1.999 | min |
+| CO2 | 0.358 | kg |
+| PM10 total | 19.929 | mg |
+| PM2,5 total | 10.576 | mg |
+| Énergie freins | 0.432 | kWh |
+| Distance moteur saturé | 2.008 | km |
 
 ## Élasticités ε = (ΔΔ/Δ_base) / (Δp/p_base)
 
 | Paramètre | Nominal | Carburant | Temps | CO2 | PM10 total | PM2,5 total | Énergie freins | Distance moteur saturé |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| η_indicated | 0.4000 | -1.66 | 0.00 | -1.66 | -0.34 | -0.64 | 0.00 | 0.00 |
-| η_dt | 0.8500 | -0.86 | -0.68 | -0.86 | 0.27 | 0.02 | 0.54 | 0.00 |
-| k_idle (g/s/L cyl) | 0.2100 | -0.55 | 0.00 | -0.55 | -0.10 | -0.19 | 0.00 | 0.00 |
-| PCI essence | 31.8200 | -1.66 | 0.00 | -1.66 | -0.34 | -0.64 | 0.00 | 0.00 |
-| v_ref Crr(v) | 100.0000 | -0.01 | 0.00 | -0.01 | 0.00 | -0.00 | 0.00 | 0.00 |
-| k_eb (N·s·m⁻¹·L⁻¹) | 10.0000 | 0.00 | 0.00 | 0.00 | -0.22 | -0.16 | -0.28 | 0.00 |
+| η_indicated | 0.4000 | -1.63 | 0.00 | -1.63 | -0.34 | -0.63 | 0.00 | 0.00 |
+| η_dt | 0.8500 | -0.93 | -0.66 | -0.93 | 0.21 | -0.03 | 0.49 | -1.29 |
+| k_idle (g/s/L cyl) | 0.2100 | -0.53 | 0.00 | -0.53 | -0.09 | -0.18 | 0.00 | 0.00 |
+| PCI essence | 31.8200 | -1.63 | 0.00 | -1.63 | -0.34 | -0.63 | 0.00 | 0.00 |
+| v_ref Crr(v) | 100.0000 | -0.01 | 0.00 | -0.01 | 0.00 | -0.00 | 0.01 | -0.04 |
+| k_eb (N·s·m⁻¹·L⁻¹) | 10.0000 | 0.00 | 0.00 | 0.00 | -0.25 | -0.19 | -0.33 | 0.00 |
 | k_brake (g TSP/MJ) | 0.0102 | 0.00 | 0.00 | 0.00 | 0.78 | 0.58 | 0.00 | 0.00 |
-| k_tyre (g TSP/km) | 0.0107 | 0.00 | 0.00 | 0.00 | -0.00 | 0.00 | 0.00 | 0.00 |
-| k_road (g TSP/km) | 0.0150 | 0.00 | 0.00 | 0.00 | -0.00 | 0.00 | 0.00 | 0.00 |
-| P_max | 65000.0000 | 0.58 | -0.68 | 0.58 | 0.56 | 0.58 | 0.54 | 0.00 |
-| v_Pmax | 30.0000 | -0.40 | 0.59 | -0.40 | -0.39 | -0.41 | -0.37 | 0.00 |
-| a_comfort | 1.5000 | 0.99 | -0.34 | 0.99 | 0.97 | 0.96 | 0.98 | 0.00 |
+| k_tyre (g TSP/km) | 0.0107 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| k_road (g TSP/km) | 0.0150 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| P_max | 65000.0000 | 0.54 | -0.66 | 0.54 | 0.51 | 0.53 | 0.49 | -1.29 |
+| v_Pmax | 30.0000 | -0.41 | 0.57 | -0.41 | -0.37 | -0.40 | -0.34 | 1.37 |
+| a_comfort | 1.5000 | 0.84 | -0.32 | 0.84 | 0.84 | 0.83 | 0.84 | 0.31 |
 | T_cs | 60.0000 | 0.02 | 0.00 | 0.02 | 0.07 | 0.14 | 0.00 | 0.00 |
 | facteur PM échappement | 25.0000 | 0.00 | 0.00 | 0.00 | 0.22 | 0.42 | 0.00 | 0.00 |
 
@@ -40,54 +40,51 @@ Configuration : véhicule Nissan Note, sens « round », 50 km/h vs 90 km/h, dé
 Pour chaque grandeur on liste les paramètres dont |ε| > 0,5, classés par sensibilité décroissante.
 
 ### ΔCarburant
-- **PCI essence** : ε = -1.66 (↑ paramètre → ↓ écart)
-- **η_indicated** : ε = -1.66 (↑ paramètre → ↓ écart)
-- **a_comfort** : ε = 0.99 (↑ paramètre → ↑ écart)
-- **η_dt** : ε = -0.86 (↑ paramètre → ↓ écart)
-- **P_max** : ε = 0.58 (↑ paramètre → ↑ écart)
-- **k_idle (g/s/L cyl)** : ε = -0.55 (↑ paramètre → ↓ écart)
+- **η_indicated** : ε = -1.63 (↑ paramètre → ↓ écart)
+- **PCI essence** : ε = -1.63 (↑ paramètre → ↓ écart)
+- **η_dt** : ε = -0.93 (↑ paramètre → ↓ écart)
+- **a_comfort** : ε = 0.84 (↑ paramètre → ↑ écart)
+- **P_max** : ε = 0.54 (↑ paramètre → ↑ écart)
+- **k_idle (g/s/L cyl)** : ε = -0.53 (↑ paramètre → ↓ écart)
 
 ### ΔTemps
-- **η_dt** : ε = -0.68 (↑ paramètre → ↓ écart)
-- **P_max** : ε = -0.68 (↑ paramètre → ↓ écart)
-- **v_Pmax** : ε = 0.59 (↑ paramètre → ↑ écart)
+- **η_dt** : ε = -0.66 (↑ paramètre → ↓ écart)
+- **P_max** : ε = -0.66 (↑ paramètre → ↓ écart)
+- **v_Pmax** : ε = 0.57 (↑ paramètre → ↑ écart)
 
 ### ΔCO2
-- **PCI essence** : ε = -1.66 (↑ paramètre → ↓ écart)
-- **η_indicated** : ε = -1.66 (↑ paramètre → ↓ écart)
-- **a_comfort** : ε = 0.99 (↑ paramètre → ↑ écart)
-- **η_dt** : ε = -0.86 (↑ paramètre → ↓ écart)
-- **P_max** : ε = 0.58 (↑ paramètre → ↑ écart)
-- **k_idle (g/s/L cyl)** : ε = -0.55 (↑ paramètre → ↓ écart)
+- **η_indicated** : ε = -1.63 (↑ paramètre → ↓ écart)
+- **PCI essence** : ε = -1.63 (↑ paramètre → ↓ écart)
+- **η_dt** : ε = -0.93 (↑ paramètre → ↓ écart)
+- **a_comfort** : ε = 0.84 (↑ paramètre → ↑ écart)
+- **P_max** : ε = 0.54 (↑ paramètre → ↑ écart)
+- **k_idle (g/s/L cyl)** : ε = -0.53 (↑ paramètre → ↓ écart)
 
 ### ΔPM10 total
-- **a_comfort** : ε = 0.97 (↑ paramètre → ↑ écart)
+- **a_comfort** : ε = 0.84 (↑ paramètre → ↑ écart)
 - **k_brake (g TSP/MJ)** : ε = 0.78 (↑ paramètre → ↑ écart)
-- **P_max** : ε = 0.56 (↑ paramètre → ↑ écart)
+- **P_max** : ε = 0.51 (↑ paramètre → ↑ écart)
 
 ### ΔPM2,5 total
-- **a_comfort** : ε = 0.96 (↑ paramètre → ↑ écart)
-- **η_indicated** : ε = -0.64 (↑ paramètre → ↓ écart)
-- **PCI essence** : ε = -0.64 (↑ paramètre → ↓ écart)
+- **a_comfort** : ε = 0.83 (↑ paramètre → ↑ écart)
+- **η_indicated** : ε = -0.63 (↑ paramètre → ↓ écart)
+- **PCI essence** : ε = -0.63 (↑ paramètre → ↓ écart)
 - **k_brake (g TSP/MJ)** : ε = 0.58 (↑ paramètre → ↑ écart)
-- **P_max** : ε = 0.58 (↑ paramètre → ↑ écart)
+- **P_max** : ε = 0.53 (↑ paramètre → ↑ écart)
 
 ### ΔÉnergie freins
-- **a_comfort** : ε = 0.98 (↑ paramètre → ↑ écart)
-- **η_dt** : ε = 0.54 (↑ paramètre → ↑ écart)
-- **P_max** : ε = 0.54 (↑ paramètre → ↑ écart)
+- **a_comfort** : ε = 0.84 (↑ paramètre → ↑ écart)
 
 ### ΔDistance moteur saturé
-- robuste : aucune élasticité ≥ 0,5 dans la plage ±25 %.
+- **v_Pmax** : ε = 1.37 (↑ paramètre → ↑ écart)
+- **η_dt** : ε = -1.29 (↑ paramètre → ↓ écart)
+- **P_max** : ε = -1.29 (↑ paramètre → ↓ écart)
 
 ## Inversions de signe
 
 Une inversion de signe entre p_low et p_high (ou par rapport au nominal) compromet l'usage comparatif.
 
-- **η_dt** sur ΔDistance moteur saturé : nominal 0.000 → low 0.000, high 0.315
-- **P_max** sur ΔDistance moteur saturé : nominal 0.000 → low 0.000, high 0.315
-- **v_Pmax** sur ΔDistance moteur saturé : nominal 0.000 → low 0.787, high 0.000
-- **a_comfort** sur ΔDistance moteur saturé : nominal 0.000 → low 0.236, high 0.000
+- aucune inversion de signe détectée sur les ±25 %. Toutes les conclusions du simulateur (ranking 50 vs 90 km/h) sont préservées.
 
 ## Distance « moteur saturé » par véhicule
 
@@ -95,9 +92,9 @@ La saturation suit le rapport puissance/masse: la Nissan Note (58 W/kg) ne tient
 
 | Véhicule | 50 km/h (km) | 90 km/h (km) | Δ (km) |
 |---|---:|---:|---:|
-| Nissan Note | 10.235 | 10.235 | 0.000 |
-| BMW X5 4.8is | 0.394 | 0.472 | 0.079 |
-| Dodge Ram 1500 | 1.653 | 2.598 | 0.945 |
+| Nissan Note | 0.748 | 2.756 | 2.008 |
+| BMW X5 4.8is | 0.000 | 0.197 | 0.197 |
+| Dodge Ram 1500 | 0.000 | 0.590 | 0.590 |
 
 ## Méthode
 
