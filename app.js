@@ -444,6 +444,9 @@ const DEFAULTS = {
   latAccel: 1.47,
   longAccel: 1.5,
   coldStart: 60,
+  payload: 75,        // single driver mass; added on top of curb mass
+  parkingIdle: 30,    // s of engine-on idle at each v=0 anchor (departure, arrival, turnaround)
+  fuelPrice: 1.989,   // user-overrideable; default = SP95-E10 Super U Passy 25/03/2026
 };
 
 const CONSTANTS = {
@@ -554,8 +557,10 @@ const LEDGER = [
   ["Véhicule Nissan Note", "m=1118 kg; Cd=0,30; A=2,25 m2; Crr=0,009; cyl. 1,4 L", ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15"]],
   ["Véhicule BMW X5 4.8is", "m=2275 kg; Cd=0,38; A=2,74 m2; Crr=0,009; cyl. 4,8 L", ["X5_SPEC", "NHTSA", "NAP15"]],
   ["Véhicule Dodge Ram 1500", "m=2366 kg; Cd=0,53; A=3,31 m2; Crr=0,009; cyl. 5,7 L", ["RAM_SPEC", "RAM_AREA", "NHTSA", "NAP15"]],
-  ["Carburant moteur", "Carburant = (E_roue / 0,85 / 0,40) / PCI + 0,21 g/s/L cylindrée x t_DFCO_off", ["WILLANS", "EPA_DRIVELINE", "IDLE_FUEL", "NAP15", "DOE"]],
-  ["Démarrage à froid", "Budget +30 % carburant et x7 PM échappement pro rata sur les coldStart premières secondes; un seul démarrage par simulation (un aller-retour continu garde le moteur chaud); curseur dans Avancé, désactivable à 0", ["EMEP_EXHAUST", "COLD_START"]],
+  ["Carburant moteur", "Carburant = (E_roue / 0,85 / 0,40) / PCI + 0,21 g/s/L cylindrée x t_DFCO_off; intégré par segment", ["WILLANS", "EPA_DRIVELINE", "IDLE_FUEL", "NAP15", "DOE"]],
+  ["Charge utile", "Masse effective = masse à vide véhicule + charge utile (curseur Avancé, défaut 75 kg = un conducteur)", ["AUTOEVO", "X5_SPEC", "RAM_SPEC"]],
+  ["Ralenti à l'arrêt", "Curseur Avancé: temps de ralenti par point d'arrêt (départ, arrivée, demi-tour aller-retour). Ajoute du carburant ralenti et du temps, sans travail mécanique", ["IDLE_FUEL"]],
+  ["Démarrage à froid", "Budget +30 % carburant et x7 PM échappement, intégré sur la fenêtre coldStart (le carburant est compté au régime instantané, pas pro rata du temps); un seul démarrage par simulation (un aller-retour continu garde le moteur chaud); curseur dans Avancé, désactivable à 0", ["EMEP_EXHAUST", "COLD_START"]],
   ["Profil aller-retour", "Aller-retour = montée à plafond ferme (identique au sens 'up') + descente en roue libre; un seul démarrage à froid", ["DYN", "COMFORT", "COLD_START"]],
   ["Air et gravité", "rho(h) = 1,225 (1 - 2,2557e-5 h)^4,2559 kg/m3; g = 9,80665 m/s2", ["ISA", "ISA_DENSITY"]],
   ["Essence", "PCI = 31,82 MJ/L, dérivé de 112114-116090 Btu/gal", ["DOE"]],
@@ -579,6 +584,9 @@ if (typeof document !== "undefined") document.addEventListener("DOMContentLoaded
     "latAccel",
     "longAccel",
     "coldStart",
+    "payload",
+    "parkingIdle",
+    "fuelPrice",
   ].forEach((id) => {
     els[id] = document.getElementById(id);
     els[`${id}Out`] = document.getElementById(`${id}Out`);
@@ -651,12 +659,18 @@ function syncOutputs() {
     maximumFractionDigits: 2,
   })} m/s2`;
   document.getElementById("coldStartOut").textContent = `${fr.format(state.coldStart)} s`;
+  document.getElementById("payloadOut").textContent = `${fr.format(state.payload)} kg`;
+  document.getElementById("parkingIdleOut").textContent = `${fr.format(state.parkingIdle)} s`;
+  document.getElementById("fuelPriceOut").textContent = `${state.fuelPrice.toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} €/L`;
 }
 
 function getParams() {
   const vehicle = VEHICLES[state.vehicleId] || VEHICLES.note;
   return {
-    mass: vehicle.mass,
+    // Effective mass = curb + payload. Affects every mass-scaled output (climb work,
+    // brake work, tyre/road PM via massScale).
+    mass: vehicle.mass + state.payload,
+    curbMass: vehicle.mass,
     cd: vehicle.cd,
     area: vehicle.area,
     crr: vehicle.crr,
@@ -667,6 +681,8 @@ function getParams() {
     latAccel: state.latAccel,
     longAccel: state.longAccel,
     coldStartSeconds: state.coldStart,
+    parkingIdleSeconds: state.parkingIdle,
+    fuelPriceEurPerL: state.fuelPrice,
   };
 }
 
@@ -1004,8 +1020,17 @@ function simulate(targetKmh, params, route) {
   let climbJ = 0;
   let inertiaJ = 0;
   let timeS = 0;
-  // Idle fuel still flows whenever the engine is not in deceleration fuel-cut: at low
-  // speed (below DFCO threshold) or when the wheels are pulling. See IDLE_FUEL.
+  // Per-segment fuel is accumulated directly so the cold-start window can integrate the
+  // *actual* fuel rate during the launch (which is 3-5x the trip mean) rather than a
+  // time pro-rata of the trip-mean rate. The pro-rata version under-counted cold-start
+  // surcharge by ~5x for trips longer than a few minutes. See WILLANS, COLD_START.
+  let warmFuelL = 0;
+  let coldWindowFuelL = 0;
+  const coldEndS = params.coldStartSeconds || 0;
+  const fuelDensityKgL = CONSTANTS.gasolineDensityKgPerL;
+  const idleRateLPerS = (CONSTANTS.idleFuelGPerSPerL * params.displacementL) / (fuelDensityKgL * 1000);
+  const fuelLhvJ = CONSTANTS.gasolineLhvMJPerL * 1e6;
+  const fuelDivisor = CONSTANTS.drivetrainEfficiency * CONSTANTS.indicatedEfficiency * fuelLhvJ;
   let idleSecondsS = 0;
   const brakeBySegment = [];
 
@@ -1046,6 +1071,20 @@ function simulate(targetKmh, params, route) {
     rollJ += fRoll * ds;
     climbJ += Math.max(fGrade, 0) * ds;
     inertiaJ += Math.max(fInertia, 0) * ds;
+
+    // Per-segment Willans-line fuel: traction work / (eta_dt * eta_ind * Hu) plus idle
+    // when not in DFCO. See WILLANS, IDLE_FUEL.
+    const segTractionFuelL = (Math.max(fWheel, 0) * ds) / fuelDivisor;
+    const segIdleFuelL = (fWheel > 0 || vAvg < kmhToMps(CONSTANTS.dfcoMinKmh))
+      ? idleRateLPerS * dt
+      : 0;
+    const segFuelL = segTractionFuelL + segIdleFuelL;
+    warmFuelL += segFuelL;
+    if (timeS < coldEndS) {
+      // The cold window may span only part of this segment.
+      const fracInWindow = Math.min(1, (coldEndS - timeS) / Math.max(dt, 1e-9));
+      coldWindowFuelL += segFuelL * fracInWindow;
+    }
     timeS += dt;
     if (fWheel > 0 || vAvg < kmhToMps(CONSTANTS.dfcoMinKmh)) {
       idleSecondsS += dt;
@@ -1056,23 +1095,32 @@ function simulate(targetKmh, params, route) {
     });
   }
 
-  // Willans / Pachernegg: traction fuel = wheel work / (eta_dt x eta_indicated),
-  // with idle fuel added during DFCO-disabled time. See WILLANS, EPA_DRIVELINE, IDLE_FUEL.
-  const tractionFuelJ = tractionJ / (CONSTANTS.drivetrainEfficiency * CONSTANTS.indicatedEfficiency);
-  const tractionFuelL = tractionFuelJ / (CONSTANTS.gasolineLhvMJPerL * 1e6);
-  const idleFuelG = CONSTANTS.idleFuelGPerSPerL * params.displacementL * idleSecondsS;
-  const idleFuelL = idleFuelG / (CONSTANTS.gasolineDensityKgPerL * 1000);
-  const warmFuelL = tractionFuelL + idleFuelL;
-  // Cold-start budget: SI gasoline burns ~30 % more fuel and emits ~7x exhaust PM until
-  // catalyst light-off. Apply the budget pro rata to the first coldStartSeconds of the
-  // trip. A continuous round trip (brief stop at the maison médicale) keeps the engine
-  // warm, so a single cold start is applied; a user wanting to model two separate cold
-  // starts can simply set the slider to twice the catalyst light-off duration. Setting
-  // the slider to 0 turns the budget off for warm-engine comparisons. See COLD_START.
-  const coldFraction = Math.min(1, (params.coldStartSeconds || 0) / Math.max(timeS, 1));
-  const coldStartFuelL = coldFraction * warmFuelL * 0.30;
+  // Parking idle: engine on at v=0 anchors. One-way trip = 2 anchors (departure +
+  // arrival), round trip = 3 anchors (departure + turnaround + arrival). Adds idle
+  // fuel and time but no kinematic work. See IDLE_FUEL.
+  const idleAnchorCount = route.direction === "round" ? 3 : 2;
+  const parkingIdleS = idleAnchorCount * (params.parkingIdleSeconds || 0);
+  const parkingIdleFuelL = idleRateLPerS * parkingIdleS;
+  warmFuelL += parkingIdleFuelL;
+  // Parking idle is treated as occurring before / after the trip; it is included in the
+  // cold window only to the extent that coldEndS exceeds the moving time.
+  if (timeS < coldEndS) {
+    const remainingCold = Math.min(parkingIdleS, coldEndS - timeS);
+    coldWindowFuelL += idleRateLPerS * remainingCold;
+  }
+  timeS += parkingIdleS;
+  idleSecondsS += parkingIdleS;
+
+  // Cold-start surcharge: during the cold window the engine burns +30 % more fuel and
+  // the catalyst lets through ~7x exhaust PM. coldFractionByFuel is the share of warm
+  // fuel actually burned during the first coldStartSeconds, so the launch (high
+  // instantaneous fuel rate) gets the right weight - unlike the previous time pro-rata.
+  // See COLD_START.
+  const coldFractionByFuel = warmFuelL > 0 ? coldWindowFuelL / warmFuelL : 0;
+  const coldStartFuelL = coldWindowFuelL * 0.30;
   const fuelL = warmFuelL + coldStartFuelL;
-  const fuelCostEur = fuelL * CONSTANTS.fuelPriceEurPerL;
+  const fuelPriceEurPerL = (params.fuelPriceEurPerL ?? CONSTANTS.fuelPriceEurPerL);
+  const fuelCostEur = fuelL * fuelPriceEurPerL;
   const distanceKm = distanceM / 1000;
   const avgKmh = (distanceKm / (timeS / 3600));
   const massScale = params.mass / VEHICLES.note.mass;
@@ -1096,7 +1144,7 @@ function simulate(targetKmh, params, route) {
   // Ne pondérer que la surconsommation par 7x (le bug initial) sous-évaluerait le total
   // de ~20 %. See EMEP_TIER3, COLD_START.
   const warmFuelKg = warmFuelL * CONSTANTS.gasolineDensityKgPerL;
-  const coldMultiplier = (1 - coldFraction) + coldFraction * 1.30 * 7;
+  const coldMultiplier = (1 - coldFractionByFuel) + coldFractionByFuel * 1.30 * 7;
   const exhaustPmMg = warmFuelKg * params.exhaustPmMgPerKgFuel * coldMultiplier;
 
   // Each segment's PM10 = energy_J x 1e-6 x brakeTspGPerMJ x brakePM10. Equivalent to
@@ -1221,7 +1269,7 @@ function renderMetrics(a, b) {
   const speedRefs = ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132"];
   const rows = [
     ["Carburant", "fuelL", " L", 2, true, ["DYN", "OTD", "CURVE", "COMFORT", "NAP15", "DOE", ...speedRefs, ...vehicleRefs], "Bilan longitudinal, rendement moteur et PCI essence.", "percent", "compact"],
-    [`Coût carburant <small>${fmt(CONSTANTS.fuelPriceEurPerL, 3, " €/L")}</small>`, "fuelCostEur", " €", 2, true, ["FUELPRICE", "DYN", "DOE", "NAP15", ...speedRefs, ...vehicleRefs], "Litres simulés multipliés par le prix SP95-E10 déclaré pour Super U Passy.", "absolute", "compact"],
+    [`Coût carburant <small>${fmt(state.fuelPrice, 3, " €/L")}</small>`, "fuelCostEur", " €", 2, true, ["FUELPRICE", "DYN", "DOE", "NAP15", ...speedRefs, ...vehicleRefs], "Litres simulés multipliés par le prix essence (curseur Avancé; défaut SP95-E10 Super U Passy 25/03/2026).", "absolute", "compact"],
     ["Consommation", "fuelLPer100", " L/100 km", 1, true, ["DYN", "OTD", "NAP15", "DOE", ...speedRefs, ...vehicleRefs], "Carburant simulé rapporté à la distance routière."],
     ["CO2 échappement", "co2Kg", " kg", 2, true, ["DYN", "DOE", "EPA", "NAP15", ...speedRefs, ...vehicleRefs], "Litres d'essence multipliés par le facteur CO2 essence."],
     ["PM10 total", "totalPm10Mg", " mg", 0, true, ["EMEP", "EMEP_EXHAUST", "BEDDOWS", "BRAKE", ...speedRefs, ...vehicleRefs], "PM10 hors échappement + PM échappement essence, assimilé à PM10."],
