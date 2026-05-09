@@ -41,3 +41,33 @@ Le modèle est volontairement transparent:
   segment.
 
 Les sources et les limites sont affichées dans la section "Formules, constantes et sources".
+
+## Limites assumées
+
+- **Démarrage à froid pro-rata.** Le surcoût carburant et la pénalité PM échappement
+  sont étalés uniformément sur les premières `coldStart` secondes du trajet. Cela
+  reproduit correctement les *totaux* d'un trajet, pas la distribution *spatiale* des
+  PM échappement (la vraie courbe d'amorçage du catalyseur est exponentielle, pas
+  linéaire). Les cartes PM hors échappement, elles, sont bien spatialisées par
+  l'énergie de plaquettes locale.
+- **Frein moteur k × cylindrée × vitesse.** Approximation linéaire à un seul rapport
+  de boîte; convenable pour de la vulgarisation et pour les comparaisons entre
+  véhicules sur le *même* trajet, faible pour de la précision scientifique
+  (un rétrogradage en descente change l'ordre de grandeur).
+- **Facteurs PM hors échappement.** Les coefficients EMEP/EEA et la calibration
+  Hagino sont défendables pour des comparaisons relatives mais portent des
+  incertitudes de ±50 % à ±100 % selon le composé. À privilégier en *delta*
+  entre scénarios plutôt qu'en valeur absolue.
+- **Conduite déterministe, pas observée.** Le profil de vitesse représente un
+  conducteur idéal qui suit le régulateur, ne fait jamais d'écart, freine au seuil
+  de confort exact. Les essais terrain (cf. `validation-experimentale.md`)
+  exposent l'écart à la conduite réelle.
+- **Aller-retour = un démarrage à froid unique.** Hypothèse d'un trajet continu
+  avec un bref arrêt à la maison médicale (moteur reste chaud). Pour modéliser
+  deux démarrages distincts (par ex. trajet du matin + trajet de l'après-midi),
+  doubler la valeur du curseur "Démarrage à froid".
+
+Numériquement, l'aller-retour égale la somme montée + descente sur les grandeurs
+purement cinématiques (temps, énergie de freinage) ; il diffère légèrement sur
+le carburant et les PM échappement à cause du décompte unique du démarrage à
+froid décrit ci-dessus.
