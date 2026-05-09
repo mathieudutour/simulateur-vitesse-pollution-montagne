@@ -102,6 +102,12 @@ const SOURCES = [
     note: "Rendement de transmission boîte manuelle / pont autour de 0,85 (boîte automatique 0,80-0,82) repris pour la chaîne de traction.",
   },
   {
+    id: "BSFC_DROOP",
+    title: "Heywood, Internal Combustion Engine Fundamentals, ch. 4 & 9",
+    url: "https://www.mheducation.com/highered/product/internal-combustion-engine-fundamentals-2e-heywood/M9781260116106.html",
+    note: "Le rendement indiqué d'un moteur SI essence chute au-delà du sweet spot BSFC: enrichissement anti-détonation au-dessus de lambda = 1, montée en RPM hors de la plage de couple optimale, augmentation des pertes thermiques. Modèle utilisé: eta_ind(load) = eta_max (1 - beta max(0, load - load_crit)^2) avec load = P_brake / P_max, load_crit = 0,5, beta = 0,6; eta_ind ~0,40 jusqu'à load = 0,5 puis chute à ~0,34 à pleine charge (-15 % relatif, en ligne avec les cartes BSFC de Heywood ch. 4 fig. 4-31).",
+  },
+  {
     id: "IDLE_FUEL",
     title: "Argonne / SAE 2014-01-1147, gasoline idle fuel rate",
     url: "https://www.sae.org/publications/technical-papers/content/2014-01-1147/",
@@ -486,11 +492,18 @@ const CONSTANTS = {
   // Tier 3 EMEP par masse de carburant: les émissions PM échappement suivent le
   // débit de carburant plutôt que la distance. Le facteur exact dépend de la norme et
   // est porté par chaque profil véhicule. See EMEP_TIER3, EMEP_EURO_TIERS.
-  // Willans-line: traction part of fuel = (P_wheel / eta_dt) / eta_indicated.
-  // eta_brake ~22 % (NAP15) emerges from eta_indicated x mech / (mech + idle), so the
-  // legacy flat-22 % value is preserved at the calibration point but degrades at low
-  // load and improves near peak BMEP. See WILLANS, NAP15, EPA_DRIVELINE.
+  // Willans-line: traction part of fuel = (P_wheel / eta_dt) / eta_indicated(load).
+  // eta_brake ~22 % (NAP15) emerges from eta_indicated x mech / (mech + idle); the flat
+  // 0.40 is the *peak* value at moderate load. Above bsfcLoadCritical the ECU enriches
+  // the mixture against knock and eta_ind droops:
+  //   eta_ind(load) = indicatedEfficiency x (1 - bsfcDroop * max(0, load - bsfcLoadCritical)^2)
+  // load = P_brake / P_max. See WILLANS, NAP15, EPA_DRIVELINE, BSFC_DROOP.
   indicatedEfficiency: 0.40,
+  // BSFC droop: load_critical at 0.5 captures the combined effect of enrichment plus
+  // RPM rise (since we don't model gear / RPM). beta = 0.6 calibrated so eta_ind drops
+  // to ~0.34 at WOT, matching the ~12-15 % relative BSFC penalty in Heywood's SI maps.
+  bsfcLoadCritical: 0.5,
+  bsfcDroop: 0.6,
   drivetrainEfficiency: 0.85,
   // Idle fuel scales with displacement; 0,21 g/s/L tracks Argonne data for warm SI.
   // See IDLE_FUEL.
@@ -582,7 +595,7 @@ const LEDGER = [
   ["Véhicule Nissan Note", "m=1118 kg; Cd=0,30; A=2,25 m2; Crr=0,009; cyl. 1,4 L", ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15"]],
   ["Véhicule BMW X5 4.8is", "m=2275 kg; Cd=0,38; A=2,74 m2; Crr=0,009; cyl. 4,8 L", ["X5_SPEC", "NHTSA", "NAP15"]],
   ["Véhicule Dodge Ram 1500", "m=2366 kg; Cd=0,53; A=3,31 m2; Crr=0,009; cyl. 5,7 L", ["RAM_SPEC", "RAM_AREA", "NHTSA", "NAP15"]],
-  ["Carburant moteur", "Par segment: dF = max(F_roue,0) ds / (eta_dt eta_ind PCI) + (k_idle x cyl x dt) si moteur non en DFCO, avec eta_dt = 0,85, eta_ind = 0,40, k_idle = 0,21 g/s/L. F_total = somme des dF segments + ralenti à l'arrêt + démarrage à froid", ["WILLANS", "EPA_DRIVELINE", "IDLE_FUEL", "NAP15", "DOE"]],
+  ["Carburant moteur", "Par segment: dF = max(F_roue,0) ds / (eta_dt eta_ind(load) PCI) + (k_idle x cyl x dt) si moteur non en DFCO, avec eta_dt = 0,85, eta_ind(load) = 0,40 (1 - 0,6 max(0, load - 0,5)^2), load = P_brake/P_max, k_idle = 0,21 g/s/L. F_total = somme des dF segments + ralenti à l'arrêt + démarrage à froid", ["WILLANS", "EPA_DRIVELINE", "IDLE_FUEL", "BSFC_DROOP", "NAP15", "DOE"]],
   ["Charge utile", "m_eff = m_à_vide + payload (curseur Avancé, défaut 75 kg = un conducteur). m_eff entre dans F_roll, F_grade, F_inertia et l'échelle massique des PM pneus / chaussée", ["AUTOEVO", "X5_SPEC", "RAM_SPEC"]],
   ["Ralenti à l'arrêt", "Carburant_ralenti = n_anchors x parkingIdle x k_idle x cylindrée; n_anchors = 2 (sens unique) ou 3 (aller-retour: départ + demi-tour + arrivée). Ajoute du temps mais aucun travail aux roues. Curseur Avancé, défaut 30 s", ["IDLE_FUEL"]],
   ["Démarrage à froid", "Fenêtre froide T_cs (curseur Avancé, défaut 60 s; doublée si 'deux trajets séparés'). Carburant_froid = 0,30 x carburant_intégré_dans_T_cs (intégration au régime instantané, pas pro rata du temps). PM échappement = facteur_véhicule x masse_carburant x [(1 - f_carb_froid) + f_carb_froid x 1,30 x 7], avec f_carb_froid = part du carburant brûlée dans la fenêtre froide", ["EMEP_EXHAUST", "COLD_START"]],
@@ -1125,8 +1138,14 @@ function simulate(targetKmh, params, route) {
   // Idle fuel rate per second: k_idle [g/s/L] x cylindree [L] / density [g/L].
   const idleRateLPerS = (CONSTANTS.idleFuelGPerSPerL * params.displacementL) / (fuelDensityKgL * 1000);
   const fuelLhvJ = CONSTANTS.gasolineLhvMJPerL * 1e6;
-  // eta_dt x eta_ind x PCI: divisor that converts wheel work [J] to fuel volume [L].
-  const fuelDivisor = CONSTANTS.drivetrainEfficiency * CONSTANTS.indicatedEfficiency * fuelLhvJ;
+  // eta_dt x PCI is loop-invariant; eta_ind is per-segment because it droops at high
+  // load (BSFC_DROOP). For a given segment with brake power P_b = max(F_wheel,0) * v
+  // / eta_dt, load = P_b / P_max and:
+  //   eta_ind(load) = indicatedEfficiency x (1 - bsfcDroop x max(0, load - bsfcLoadCritical)^2)
+  const fuelDivisorPartial = CONSTANTS.drivetrainEfficiency * fuelLhvJ;
+  // Accumulator so the user can see the load-weighted average eta_ind in the result.
+  let etaIndWeighted = 0;
+  let etaIndWeight = 0;
   let idleSecondsS = 0;
   const brakeBySegment = [];
 
@@ -1170,12 +1189,23 @@ function simulate(targetKmh, params, route) {
     climbJ += Math.max(fGrade, 0) * ds;
     inertiaJ += Math.max(fInertia, 0) * ds;
 
-    // Per-segment Willans-line fuel: traction work / (eta_dt * eta_ind * Hu) plus idle
-    // when not in DFCO. See WILLANS, IDLE_FUEL.
-    const segTractionFuelL = (Math.max(fWheel, 0) * ds) / fuelDivisor;
+    // Per-segment Willans-line fuel: traction work / (eta_dt * eta_ind(load) * Hu) plus
+    // idle when not in DFCO. eta_ind droops at high load (BSFC_DROOP), so an aggressive
+    // uphill push spends fuel less efficiently than a steady cruise even after the comfort
+    // accel and brake-PM effects are accounted for. See WILLANS, BSFC_DROOP, IDLE_FUEL.
+    const segPbrake = Math.max(fWheel, 0) * vAvg / CONSTANTS.drivetrainEfficiency;
+    const segLoad = Math.min(1, segPbrake / params.maxPowerW);
+    const overload = Math.max(0, segLoad - CONSTANTS.bsfcLoadCritical);
+    const segEtaInd = CONSTANTS.indicatedEfficiency * (1 - CONSTANTS.bsfcDroop * overload * overload);
+    const segTractionFuelL = (Math.max(fWheel, 0) * ds) / (fuelDivisorPartial * segEtaInd);
     const segIdleFuelL = (fWheel > 0 || vAvg < kmhToMps(CONSTANTS.dfcoMinKmh))
       ? idleRateLPerS * dt
       : 0;
+    // Track a traction-work-weighted average eta_ind for diagnostic display.
+    if (fWheel > 0) {
+      etaIndWeighted += segEtaInd * Math.max(fWheel, 0) * ds;
+      etaIndWeight += Math.max(fWheel, 0) * ds;
+    }
     const segFuelL = segTractionFuelL + segIdleFuelL;
     warmFuelL += segFuelL;
     if (timeS < coldEndS) {
@@ -1296,6 +1326,7 @@ function simulate(targetKmh, params, route) {
     roadPm10Mg: roadTsp * CONSTANTS.roadPM10 * 1000,
     brakePmHotspots,
     powerLimitedKm: powerLimitedDistanceM / 1000,
+    etaIndPct: 100 * (etaIndWeight > 0 ? etaIndWeighted / etaIndWeight : CONSTANTS.indicatedEfficiency),
   };
 }
 
@@ -1393,6 +1424,7 @@ function renderMetrics(a, b) {
     ["Temps", "timeMin", " min", 1, true, ["OSM", "LEGIFRANCE", "CURVE", "COMFORT"], "Distance segmentée divisée par le profil de vitesse plafonné par les limites locales.", "absolute"],
     ["Vitesse moyenne", "avgKmh", " km/h", 1, false, ["OSM", "LEGIFRANCE", "CURVE", "COMFORT"], "Distance routière divisée par le temps simulé."],
     ["Distance moteur saturé", "powerLimitedKm", " km", 2, true, ["EU_POWER", "TORQUE_CURVE", "SAE_J1349", ...vehicleRefs], "Distance sur laquelle le moteur ne peut pas tenir la consigne de confort (poweredAccel < longAccel); diagnostic des montées soutenues.", "absolute"],
+    ["Rendement indiqué moyen", "etaIndPct", " %", 1, false, ["WILLANS", "BSFC_DROOP", ...vehicleRefs], "Moyenne pondérée par le travail aux roues du rendement indiqué eta_ind(load) = 0,40 (1 - 0,6 max(0, load - 0,5)^2). Une conduite sportive à pleine charge fait chuter cet indicateur (BSFC droop).", "absolute"],
   ];
 
   document.getElementById("metrics").innerHTML = rows
