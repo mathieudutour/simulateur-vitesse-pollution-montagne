@@ -65,7 +65,22 @@ Les sources et les limites sont affichées dans la section "Formules, constantes
 - **Aller-retour = un démarrage à froid unique.** Hypothèse d'un trajet continu
   avec un bref arrêt à la maison médicale (moteur reste chaud). Pour modéliser
   deux démarrages distincts (par ex. trajet du matin + trajet de l'après-midi),
-  doubler la valeur du curseur "Démarrage à froid".
+  cocher l'option "Aller-retour = deux trajets séparés" dans Avancé.
+- **Pas de vent ni de météo.** Le calcul aérodynamique suppose une atmosphère
+  immobile et la résistance au roulement une route sèche. Un vent de face de
+  5 m/s ajoute environ 16 % à la traînée à 70 km/h ; la pluie réduit
+  l'adhérence brique-pneu mais augmente peu Crr. Le simulateur n'est pas valide
+  par jour de fort vent ou route mouillée / enneigée.
+- **Pas d'épuisement de freins.** Le pas en arrière ne plafonne pas la
+  décélération autrement que par le confort + g sin(theta) ; aucune fatigue
+  thermique des disques / plaquettes n'est modélisée. Pour un col plus long ou
+  plus pentu que celui-ci, la fatigue de freinage devient un phénomène réel
+  (test du tunnel du Mont-Blanc, descente du Galibier, etc.).
+- **Pas de limite de grip.** La force de traction disponible est plafonnée par
+  la puissance moteur, jamais par l'adhérence des roues motrices. Sur asphalte
+  sec et nos trois véhicules en charge ordinaire le grip n'est jamais
+  contraignant ; sur neige / verglas (μ ≈ 0,2) le X5 et le Ram dépasseraient
+  leur limite d'adhérence avant leur limite de puissance.
 
 Numériquement, l'aller-retour égale la somme montée + descente sur les grandeurs
 purement cinématiques (temps, énergie de freinage) ; il diffère légèrement sur
