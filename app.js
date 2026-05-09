@@ -447,6 +447,7 @@ const DEFAULTS = {
   vehicleId: "note",
   speedA: 90,
   speedB: 50,
+  driverStyle: "normal",
   latAccel: 1.47,
   longAccel: 1.5,
   coldStart: 60,
@@ -454,6 +455,20 @@ const DEFAULTS = {
   parkingIdle: 30,    // s of engine-on idle at each v=0 anchor (departure, arrival, turnaround)
   fuelPrice: 1.989,   // user-overrideable; default = SP95-E10 Super U Passy 25/03/2026
   twoTrips: false,    // round trip = two separate trips (engine cools at turnaround)
+};
+
+// Driver-style presets. Selecting a preset overwrites the comfort sliders; the user is
+// still free to drag the sliders afterward (the "active" preset chip clears when the
+// sliders no longer match a preset). Lateral comfort is held the same between Éco and
+// Normale because curve speed is a physics threshold, not a preference; a Sport driver
+// pushes the friction circle harder. See COMFORT, CURVE.
+const DRIVER_STYLES = {
+  // Hypermiling guidance: gentle accel, comfort lateral unchanged.
+  eco:    { longAccel: 0.8, latAccel: 1.47 },
+  // Current default; matches passenger-comfort thresholds (TR Part F 2025).
+  normal: { longAccel: 1.5, latAccel: 1.47 },
+  // Just below typical road-tire grip ceiling on dry asphalt; FHWA "high friction".
+  sport:  { longAccel: 2.8, latAccel: 2.5 },
 };
 
 const CONSTANTS = {
@@ -633,6 +648,19 @@ if (typeof document !== "undefined") document.addEventListener("DOMContentLoaded
     });
   });
 
+  document.querySelectorAll("[data-style]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const preset = DRIVER_STYLES[button.dataset.style];
+      if (!preset) return;
+      state.driverStyle = button.dataset.style;
+      state.longAccel = preset.longAccel;
+      state.latAccel = preset.latAccel;
+      if (els.longAccel) els.longAccel.value = preset.longAccel;
+      if (els.latAccel) els.latAccel.value = preset.latAccel;
+      update();
+    });
+  });
+
   document.getElementById("resetButton").addEventListener("click", () => {
     state = { ...DEFAULTS };
     Object.entries(DEFAULTS).forEach(([key, value]) => {
@@ -682,6 +710,17 @@ function syncOutputs() {
   document.getElementById("payloadOut").textContent = `${fr.format(state.payload)} kg`;
   document.getElementById("parkingIdleOut").textContent = `${fr.format(state.parkingIdle)} s`;
   document.getElementById("fuelPriceOut").textContent = `${state.fuelPrice.toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} €/L`;
+
+  // The driver-style chip stays highlighted only as long as both sliders match a preset.
+  // Drag either slider and the chip clears, signalling that the user is on a custom point.
+  const matchingStyle = Object.entries(DRIVER_STYLES).find(
+    ([, preset]) => Math.abs(preset.longAccel - state.longAccel) < 1e-3
+                  && Math.abs(preset.latAccel - state.latAccel) < 1e-3,
+  );
+  state.driverStyle = matchingStyle ? matchingStyle[0] : null;
+  document.querySelectorAll("[data-style]").forEach((b) => {
+    b.classList.toggle("is-active", b.dataset.style === state.driverStyle);
+  });
 }
 
 function getParams() {
