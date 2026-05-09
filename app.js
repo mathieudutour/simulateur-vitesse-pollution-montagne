@@ -192,6 +192,12 @@ const SOURCES = [
     note: "Couple de freinage moteur (FMEP+pompage) approché par une force lineaire en vitesse et en cylindrée; calibré à environ 0,3 m/s2 de décélération supplémentaire pour une 1,4 L à 90 km/h.",
   },
   {
+    id: "ROT_INERTIA",
+    title: "Genta & Morello, The Automotive Chassis vol. 2, ch. 5",
+    url: "https://link.springer.com/book/10.1007/978-1-4020-8675-5",
+    note: "Inertie des roues + transmission ajoutée à la masse effective via un facteur lambda ~0,04 (Genta & Morello). m_eff = m (1 + lambda) pour les calculs d'inertie longitudinale.",
+  },
+  {
     id: "TORQUE_CURVE",
     title: "Heywood, Internal Combustion Engine Fundamentals, ch. 2-3",
     url: "https://www.mheducation.com/highered/product/internal-combustion-engine-fundamentals-2e-heywood/M9781260116106.html",
@@ -488,6 +494,9 @@ const CONSTANTS = {
   // pour reproduire le ratio ISO 28580 / Michelin: Crr(130 km/h) / Crr(50 km/h) ~1,10.
   // See MICHELIN_CRR.
   crrSpeedRefMps: 100,
+  // Rotational inertia of wheels and driveline as fraction of vehicle mass. Adds ~4 %
+  // to the effective inertia for accelerations and decelerations. See ROT_INERTIA.
+  rotInertiaLambda: 0.04,
   tyrePM10: 0.6,
   tyrePM25: 0.42,
   brakePM10: 0.98,
@@ -551,7 +560,7 @@ const LEDGER = [
   ["Limites de vitesse", "maxspeed OSM quand tagué; 50 km/h en ville; hypothèse 90 km/h hors ville", ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132"]],
   ["Profil de vitesse montée", "v = min(v_curseur, v_limite, v_virage); accélération bornée par min(confort, F_dispo/m - F_resist) avec F_dispo = P_max(rho) x eta_dt / max(v, v_Pmax); freinage borné par confort + g sin(theta)", ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132", "CURVE", "COMFORT", "EU_POWER", "TORQUE_CURVE", "SAE_J1349"]],
   ["Descente en roue libre", "au-delà de v_curseur, pas de freinage tant que v < min(v_limite, v_virage)", ["DYN", "LEGIFRANCE", "LEGIFRANCE_R4132", "CURVE", "COMFORT"]],
-  ["Bilan des forces", "F = m a + Crr(v) m g cos(theta) + 0,5 rho(h) Cd A v2 + m g sin(theta); Crr(v) = Crr0 (1 + (v/100)^2); intégrales aero et roulement utilisent <v2> = (v_a2 + v_b2)/2", ["DYN", "MICHELIN_CRR"]],
+  ["Bilan des forces", "F = m (1 + lambda) a + Crr(v) m g cos(theta) + 0,5 rho(h) Cd A v2 + m g sin(theta); Crr(v) = Crr0 (1 + (v/100)^2); inertie rotative lambda = 0,04; intégrales aero et roulement utilisent <v2> = (v_a2 + v_b2)/2", ["DYN", "MICHELIN_CRR", "ROT_INERTIA"]],
   ["Conditions aux limites", "Vitesse nulle au départ (Super U), à l'arrivée (maison médicale) et au point de retournement (aller-retour)", []],
   ["Cinématique freinage", "v2 = v0 2 + 2 a s", ["DYN", "COMFORT"]],
   ["Véhicule Nissan Note", "m=1118 kg; Cd=0,30; A=2,25 m2; Crr=0,009; cyl. 1,4 L", ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15"]],
@@ -875,22 +884,32 @@ function buildSpeedProfile(targetKmh, params, route, n) {
   // next speed: poweredAccel < comfort AND the resulting cap is below what the curve
   // / limit / slider had already set. A car cruising under a tight curve cap with low
   // demand is therefore not flagged.
-  let powerLimitedM = 0;
-  for (let i = 1; i < points.length; i += 1) {
-    const a = points[i - 1];
-    const b = points[i];
-    const ds = b.m - a.m;
-    const theta = Math.atan2(b.elev - a.elev, Math.max(ds, 0.1));
-    const rho = airDensity((a.elev + b.elev) / 2);
-    const aPowered = poweredAccel(params, a.speedMps, theta, rho);
-    const accelEff = Math.min(params.longAccel, aPowered);
-    const accelLimit = Math.sqrt(Math.max(0, a.speedMps * a.speedMps + 2 * accelEff * ds));
-    const cappedSpeed = Math.max(minSpeed, accelLimit);
-    if (aPowered < params.longAccel && cappedSpeed < points[i].speedMps - 1e-6) {
-      powerLimitedM += ds;
+  //
+  // We run forward then backward, then forward once more (Gauss-Seidel sweep): the
+  // backward pass can lower v_i, which means the previous forward result for v_{i+1}
+  // may no longer be reachable from the new v_i. Re-running forward enforces kinematic
+  // consistency. The diagnostic powerLimitedM is taken from the final forward pass.
+  const runForwardPass = () => {
+    let limited = 0;
+    for (let i = 1; i < points.length; i += 1) {
+      const a = points[i - 1];
+      const b = points[i];
+      const ds = b.m - a.m;
+      const theta = Math.atan2(b.elev - a.elev, Math.max(ds, 0.1));
+      const rho = airDensity((a.elev + b.elev) / 2);
+      const aPowered = poweredAccel(params, a.speedMps, theta, rho);
+      const accelEff = Math.min(params.longAccel, aPowered);
+      const accelLimit = Math.sqrt(Math.max(0, a.speedMps * a.speedMps + 2 * accelEff * ds));
+      const cappedSpeed = Math.max(minSpeed, accelLimit);
+      if (aPowered < params.longAccel && cappedSpeed < points[i].speedMps - 1e-6) {
+        limited += ds;
+      }
+      points[i].speedMps = Math.min(points[i].speedMps, cappedSpeed);
     }
-    points[i].speedMps = Math.min(points[i].speedMps, cappedSpeed);
-  }
+    return limited;
+  };
+
+  runForwardPass();
 
   // Backward pass: comfort decel adjusted for slope (uphill braking is gravity-aided,
   // downhill is gravity-opposed). Clamp >= 0.5 m/s2 to keep stops feasible on steep grades.
@@ -903,6 +922,10 @@ function buildSpeedProfile(targetKmh, params, route, n) {
     const brakeLimit = Math.sqrt(b.speedMps * b.speedMps + 2 * decelEff * ds);
     points[i].speedMps = Math.min(points[i].speedMps, brakeLimit);
   }
+
+  // Second forward pass: enforces engine-cap kinematic consistency after the backward
+  // pass possibly lowered some v_i. Final powerLimitedM comes from this pass.
+  const powerLimitedM = runForwardPass();
 
   if (route.direction === "up") return { points, powerLimitedM };
 
@@ -963,6 +986,11 @@ function applyCoastingDescentProfile(capPoints, targetMps, params, startIdx) {
   return points;
 }
 
+// Instantaneous coasting deceleration at speedMps on the slope between a and b.
+// Note: this evaluates aero and rolling at the *point* speed, while simulate() integrates
+// work over space using the spatial mean <v^2> = (v_a^2 + v_b^2) / 2. Both are correct
+// for what they compute (instantaneous decel here vs. integrated work there); the
+// asymmetry is intentional. See DYN, MICHELIN_CRR.
 function coastingAcceleration(speedMps, a, b, params) {
   const ds = Math.max(b.m - a.m, 0.1);
   const dh = b.elev - a.elev;
@@ -1052,7 +1080,9 @@ function simulate(targetKmh, params, route) {
     const fRoll = crrV * params.mass * CONSTANTS.g * Math.cos(theta);
     const fAero = 0.5 * rho * params.cd * params.area * vSqMean;
     const fGrade = params.mass * CONSTANTS.g * Math.sin(theta);
-    const fInertia = params.mass * acc;
+    // Rotational inertia of wheels + driveline acts like extra translational mass during
+    // acceleration. See ROT_INERTIA.
+    const fInertia = params.mass * (1 + CONSTANTS.rotInertiaLambda) * acc;
     const fWheel = fRoll + fAero + fGrade + fInertia;
     const dt = ds / vAvg;
 
