@@ -60,6 +60,12 @@ const SOURCES = [
     note: "Coefficient de résistance au roulement Crr=0,009 repris pour les profils véhicules.",
   },
   {
+    id: "MICHELIN_CRR",
+    title: "Michelin, Tire rolling resistance and fuel economy",
+    url: "https://www.michelin.com/en/innovation/tire-environment/tire-rolling-resistance/",
+    note: "Le coefficient de résistance au roulement augmente avec la vitesse. Approximation utilisée: Crr(v) = Crr0 (1 + (v/100 m/s)^2), calibrée pour reproduire le rapport ISO 28580 / Michelin Crr(130 km/h)/Crr(50 km/h) ~1,10. v_ref = 100 m/s -> ratio 1,13 à 130 km/h, 1,04 à 50 km/h.",
+  },
+  {
     id: "BEDDOWS",
     title: "Beddows & Harrison, Atmospheric Environment 2021",
     url: "https://research.birmingham.ac.uk/en/publications/pmsub10sub-and-pmsub25sub-emission-factors-for-non-exhaust-partic",
@@ -72,10 +78,34 @@ const SOURCES = [
     note: "Densité de l'air au niveau mer et accélération standard de la pesanteur.",
   },
   {
+    id: "ISA_DENSITY",
+    title: "ICAO Standard Atmosphere, barometric form",
+    url: "https://www.icao.int/environmental-protection/Documents/Publications/Doc%207488.pdf",
+    note: "Forme troposphérique rho(h) = rho0 (1 - L h)^4,2559 utilisée pour corriger la densité de l'air aux altitudes 578-1039 m du parcours.",
+  },
+  {
     id: "NAP15",
     title: "National Academies, SI gasoline engines, 2015",
     url: "https://www.nationalacademies.org/read/21744/chapter/4",
-    note: "Rendement thermique au frein typique autour de 22 % en conditions FTP.",
+    note: "Rendement thermique au frein typique autour de 22 % en conditions FTP; rendement indiqué de l'ordre de 38-40 %.",
+  },
+  {
+    id: "WILLANS",
+    title: "Guzzella & Sciarretta, Vehicle Propulsion Systems, 3rd ed., ch. 2",
+    url: "https://link.springer.com/book/10.1007/978-3-642-35913-2",
+    note: "Droite de Willans: P_carburant = (P_roue / eta_transmission + P_idle) / eta_indique; capture la dépendance charge du rendement effectif.",
+  },
+  {
+    id: "EPA_DRIVELINE",
+    title: "An & Stodolsky, ANL/ESD-43, vehicle driveline efficiency",
+    url: "https://www.osti.gov/biblio/664251",
+    note: "Rendement de transmission boîte manuelle / pont autour de 0,85 (boîte automatique 0,80-0,82) repris pour la chaîne de traction.",
+  },
+  {
+    id: "IDLE_FUEL",
+    title: "Argonne / SAE 2014-01-1147, gasoline idle fuel rate",
+    url: "https://www.sae.org/publications/technical-papers/content/2014-01-1147/",
+    note: "Consommation au ralenti d'un moteur essence 1,4-1,6 L environ 0,30 g/s; le simulateur utilise k_idle = 0,21 g/s/L de cylindrée (calé pour reproduire les ~0,30 g/s d'une 1,4 L). Appliqué (a) à chaque pas de temps hors DFCO et (b) en bloc à chaque arrêt v=0 (ralenti à l'arrêt, n_anchors x parkingIdle).",
   },
   {
     id: "DOE",
@@ -87,7 +117,25 @@ const SOURCES = [
     id: "EPA",
     title: "U.S. EPA GHG Equivalencies",
     url: "https://www.epa.gov/energy/greenhouse-gas-equivalencies-calculator-calculations-and-references",
-    note: "Facteur 8887 g CO2 par gallon d'essence consommé.",
+    note: "Facteur 8887 g CO2 par gallon d'essence consommé (référence pure essence).",
+  },
+  {
+    id: "ADEME_E10",
+    title: "ADEME Base Carbone, SP95-E10 (combustion)",
+    url: "https://base-carbone.ademe.fr/",
+    note: "Facteur d'émission combustion SP95-E10 ~2,21 kg CO2/L; reflète la fraction bioéthanol et la densité moindre du mélange.",
+  },
+  {
+    id: "EMEP_TIER3",
+    title: "EMEP/EEA Guidebook 2023, road transport, Tier 3 fuel-based",
+    url: "https://www.eea.europa.eu/en/analysis/publications/emep-eea-guidebook-2023/part-b-sectoral-guidance-chapters/1-energy/1-a-combustion/1-a-3-b-i",
+    note: "Approche Tier 3 par masse de carburant: PM échappement ~25 mg par kg d'essence brûlée pour un Euro 5 SI, calibré pour reproduire le facteur 1,4 mg/km à 56 g/km de carburant.",
+  },
+  {
+    id: "EMEP_EURO_TIERS",
+    title: "EMEP/EEA Guidebook 2023, gasoline LDV PM by Euro class",
+    url: "https://www.eea.europa.eu/en/analysis/publications/emep-eea-guidebook-2023/part-b-sectoral-guidance-chapters/1-energy/1-a-combustion/1-a-3-b-i/view",
+    note: "Les facteurs PM échappement essence dépendent fortement de la norme: Euro 5/6 SI ~25 mg/kg, Euro 4 / Tier 2 SI ~90 mg/kg, Euro 3 SI ~120 mg/kg.",
   },
   {
     id: "EMEP",
@@ -114,10 +162,52 @@ const SOURCES = [
     note: "Essais passagers: décélérations de -1,5 à -2,5 m/s2 perçues comme confortables et sûres.",
   },
   {
+    id: "COLD_START",
+    title: "Weilenmann, Favez & Alvarez, Atmospheric Environment 2009",
+    url: "https://doi.org/10.1016/j.atmosenv.2009.01.005",
+    note: "Surconsommation et surémissions au démarrage à froid d'un véhicule essence: ~+30 % carburant et environ x7 PM échappement durant l'amorçage du catalyseur (60-90 s). Le simulateur intègre le carburant brûlé pendant les T_cs premières secondes (au régime instantané, pas pro rata du temps), puis surcharge fuel = 0,30 x carburant_intégré et PM = facteur x masse_carburant x [(1-f) + f x 1,30 x 7] avec f = part du carburant brûlée dans la fenêtre.",
+  },
+  {
     id: "BRAKE",
     title: "Xu et al., Journal of Hazardous Materials, 2022",
     url: "https://pubmed.ncbi.nlm.nih.gov/35413517/",
     note: "Les pertes d'énergie cinétique peuvent paramétrer les variations de particules de freinage.",
+  },
+  {
+    id: "HAGINO",
+    title: "Hagino, Atmospheric Environment, 2016",
+    url: "https://doi.org/10.1016/j.atmosenv.2016.02.014",
+    note: "Mesures sur banc dynamométrique: ~10 mg PM10 par MJ d'énergie dissipée aux plaquettes (calibrage TSP=10 mg/MJ utilisé ici).",
+  },
+  {
+    id: "EU_POWER",
+    title: "UTAC / constructeurs, puissances homologuées",
+    url: "https://www.auto-data.net/",
+    note: "Puissance maxi des trois profils: Nissan Note 1.4 16v ~65 kW, BMW X5 4.8is ~268 kW, Dodge Ram 1500 5.7 Hemi ~254 kW.",
+  },
+  {
+    id: "ENGINE_BRAKE",
+    title: "Heywood, Internal Combustion Engine Fundamentals, ch. 13",
+    url: "https://www.mheducation.com/highered/product/internal-combustion-engine-fundamentals-2e-heywood/M9781260116106.html",
+    note: "Couple de freinage moteur (FMEP+pompage) approché par une force lineaire en vitesse et en cylindrée; calibré à environ 0,3 m/s2 de décélération supplémentaire pour une 1,4 L à 90 km/h.",
+  },
+  {
+    id: "ROT_INERTIA",
+    title: "Genta & Morello, The Automotive Chassis vol. 2, ch. 5",
+    url: "https://link.springer.com/book/10.1007/978-1-4020-8675-5",
+    note: "Inertie des roues + transmission ajoutée à la masse effective via un facteur lambda ~0,04 (Genta & Morello). m_eff = m (1 + lambda) pour les calculs d'inertie longitudinale.",
+  },
+  {
+    id: "TORQUE_CURVE",
+    title: "Heywood, Internal Combustion Engine Fundamentals, ch. 2-3",
+    url: "https://www.mheducation.com/highered/product/internal-combustion-engine-fundamentals-2e-heywood/M9781260116106.html",
+    note: "Approche couple constant en dessous de la vitesse de puissance maxi puis puissance constante au-delà: F_dispo = P_max x eta_dt / max(v, v_Pmax). v_Pmax ~30 m/s pour une voiture particulière en rapport optimal.",
+  },
+  {
+    id: "SAE_J1349",
+    title: "SAE J1349, naturally aspirated engine power correction",
+    url: "https://www.sae.org/standards/content/j1349_201109/",
+    note: "Correction de puissance pour un moteur atmosphérique en altitude: P(h) ~ P_0 x rho(h) / rho_0; ~10 % de perte au Plateau d'Assy (1039 m).",
   },
 ];
 
@@ -359,26 +449,61 @@ const DEFAULTS = {
   speedB: 50,
   latAccel: 1.47,
   longAccel: 1.5,
+  coldStart: 60,
+  payload: 75,        // single driver mass; added on top of curb mass
+  parkingIdle: 30,    // s of engine-on idle at each v=0 anchor (departure, arrival, turnaround)
+  fuelPrice: 1.989,   // user-overrideable; default = SP95-E10 Super U Passy 25/03/2026
+  twoTrips: false,    // round trip = two separate trips (engine cools at turnaround)
 };
 
 const CONSTANTS = {
   g: 9.80665,
-  rho: 1.225,
+  // ISA troposphere: rho(h) = rho0 (1 - L h)^4,2559. See ISA, ISA_DENSITY.
+  rho0: 1.225,
+  isaLapse: 2.2557e-5,
+  isaExp: 4.2559,
   gasolineLhvMJPerL: 31.82,
+  gasolineDensityKgPerL: 0.745,
   fuelPriceEurPerL: 1.989,
-  co2KgPerL: 8.887 / 3.785411784,
+  // SP95-E10 combustion factor (ADEME Base Carbone). Le facteur EPA 8887 g/gal vise
+  // l'essence pure et surestime ~6 % le CO2 par litre de E10. See ADEME_E10.
+  co2KgPerL: 2.21,
+  // Tier 3 EMEP par masse de carburant: les émissions PM échappement suivent le
+  // débit de carburant plutôt que la distance. Le facteur exact dépend de la norme et
+  // est porté par chaque profil véhicule. See EMEP_TIER3, EMEP_EURO_TIERS.
+  // Willans-line: traction part of fuel = (P_wheel / eta_dt) / eta_indicated.
+  // eta_brake ~22 % (NAP15) emerges from eta_indicated x mech / (mech + idle), so the
+  // legacy flat-22 % value is preserved at the calibration point but degrades at low
+  // load and improves near peak BMEP. See WILLANS, NAP15, EPA_DRIVELINE.
+  indicatedEfficiency: 0.40,
+  drivetrainEfficiency: 0.85,
+  // Idle fuel scales with displacement; 0,21 g/s/L tracks Argonne data for warm SI.
+  // See IDLE_FUEL.
+  idleFuelGPerSPerL: 0.21,
+  // Below this speed, deceleration fuel-cut (DFCO) is disabled and idle fuel still flows.
+  dfcoMinKmh: 25,
   tyreTspGKm: 0.0107,
-  brakeTspGKm: 0.0142,
+  // Brake wear scales with friction-brake work (post engine-brake split). Calibrated
+  // from Hagino 2016 dynamometer data: ~10 mg PM10/MJ pad work; converted to TSP via
+  // PM10/TSP=0,98 below. See HAGINO, BRAKE.
+  brakeTspGPerMJ: 0.0102,
   roadTspGKm: 0.015,
+  // Engine-brake force F_eb = k * cylindree[L] * v[m/s]. k calibré pour donner ~0,3 m/s2
+  // de décélération supplémentaire à 25 m/s sur la 1,4 L de la Note. See ENGINE_BRAKE.
+  engineBrakeNPerLPerMps: 10,
+  // Speed-dependent rolling resistance: Crr(v) = Crr0 (1 + (v / v_ref)^2). v_ref calibré
+  // pour reproduire le ratio ISO 28580 / Michelin: Crr(130 km/h) / Crr(50 km/h) ~1,10.
+  // See MICHELIN_CRR.
+  crrSpeedRefMps: 100,
+  // Rotational inertia of wheels and driveline as fraction of vehicle mass. Adds ~4 %
+  // to the effective inertia for accelerations and decelerations. See ROT_INERTIA.
+  rotInertiaLambda: 0.04,
   tyrePM10: 0.6,
   tyrePM25: 0.42,
   brakePM10: 0.98,
   brakePM25: 0.39,
   roadPM10: 0.5,
   roadPM25: 0.27,
-  exhaustPmMgKm: 1.4,
-  pmMinKmh: 25,
-  pmReferenceKmh: 45,
   urbanSpeedKmh: 50,
   ruralSpeedKmh: 90,
 };
@@ -391,8 +516,12 @@ const VEHICLES = {
     cd: 0.3,
     area: 2.25,
     crr: 0.009,
-    efficiency: 0.22,
-    sources: ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15", "PHOTO_NOTE"],
+    displacementL: 1.4,
+    maxPowerW: 65000,
+    pmaxSpeedMps: 30,
+    euroTier: "Euro 5",
+    exhaustPmMgPerKgFuel: 25,
+    sources: ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15", "WILLANS", "EPA_DRIVELINE", "EU_POWER", "TORQUE_CURVE", "SAE_J1349", "EMEP_EURO_TIERS", "PHOTO_NOTE"],
   },
   suv: {
     label: "BMW X5 4.8is",
@@ -401,8 +530,12 @@ const VEHICLES = {
     cd: 0.38,
     area: 2.74,
     crr: 0.009,
-    efficiency: 0.22,
-    sources: ["X5_SPEC", "NHTSA", "NAP15", "PHOTO_X5"],
+    displacementL: 4.8,
+    maxPowerW: 268000,
+    pmaxSpeedMps: 35,
+    euroTier: "Euro 3",
+    exhaustPmMgPerKgFuel: 120,
+    sources: ["X5_SPEC", "NHTSA", "NAP15", "WILLANS", "EPA_DRIVELINE", "EU_POWER", "TORQUE_CURVE", "SAE_J1349", "EMEP_EURO_TIERS", "PHOTO_X5"],
   },
   pickup: {
     label: "Dodge Ram 1500",
@@ -411,8 +544,12 @@ const VEHICLES = {
     cd: 0.53,
     area: 3.31,
     crr: 0.009,
-    efficiency: 0.22,
-    sources: ["RAM_SPEC", "RAM_AREA", "NHTSA", "NAP15", "PHOTO_RAM"],
+    displacementL: 5.7,
+    maxPowerW: 254000,
+    pmaxSpeedMps: 35,
+    euroTier: "Tier 2 Bin 5",
+    exhaustPmMgPerKgFuel: 90,
+    sources: ["RAM_SPEC", "RAM_AREA", "NHTSA", "NAP15", "WILLANS", "EPA_DRIVELINE", "EU_POWER", "TORQUE_CURVE", "SAE_J1349", "EMEP_EURO_TIERS", "PHOTO_RAM"],
   },
 };
 
@@ -420,35 +557,46 @@ const LEDGER = [
   ["Points de départ et arrivée", "Super U Passy -> Maison médicale du Plateau d'Assy", ["SUPERU", "MED"]],
   ["Distance routière", "10,2351 km, géométrie OSM D39 / D43 / D13 / D43", ["OSM"]],
   ["Altitudes", "45 points EU-DEM 25 m, 578,1 à 1038,7 m", ["OTD"]],
-  ["Virages", "Rayons déduits de la géométrie OSM; v = sqrt(a_lateral x R)", ["OSM", "CURVE"]],
+  ["Virages", "Rayons déduits de la géométrie OSM; v = sqrt(a_lateral x R); cap maintenu sur la longueur d'arc R x angle", ["OSM", "CURVE"]],
   ["Limites de vitesse", "maxspeed OSM quand tagué; 50 km/h en ville; hypothèse 90 km/h hors ville", ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132"]],
-  ["Profil de vitesse montée", "v = min(v_curseur, v_limite, v_virage), avec approche freinage/accélération", ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132", "CURVE", "COMFORT"]],
+  ["Profil de vitesse montée", "v = min(v_curseur, v_limite, v_virage); accélération bornée par min(confort, F_dispo/m - F_resist) avec F_dispo = P_max(rho) x eta_dt / max(v, v_Pmax); freinage borné par confort + g sin(theta)", ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132", "CURVE", "COMFORT", "EU_POWER", "TORQUE_CURVE", "SAE_J1349"]],
   ["Descente en roue libre", "au-delà de v_curseur, pas de freinage tant que v < min(v_limite, v_virage)", ["DYN", "LEGIFRANCE", "LEGIFRANCE_R4132", "CURVE", "COMFORT"]],
-  ["Bilan des forces", "F = m a + Crr m g cos(theta) + 0,5 rho Cd A v2 + m g sin(theta)", ["DYN"]],
+  ["Bilan des forces", "F = m (1 + lambda) a + Crr(v) m g cos(theta) + 0,5 rho(h) Cd A v2 + m g sin(theta); Crr(v) = Crr0 (1 + (v/100)^2); inertie rotative lambda = 0,04; intégrales aero et roulement utilisent <v2> = (v_a2 + v_b2)/2", ["DYN", "MICHELIN_CRR", "ROT_INERTIA"]],
+  ["Conditions aux limites", "Vitesse nulle au départ (Super U), à l'arrivée (maison médicale) et au point de retournement (aller-retour)", []],
   ["Cinématique freinage", "v2 = v0 2 + 2 a s", ["DYN", "COMFORT"]],
-  ["Véhicule Nissan Note", "m=1118 kg; Cd=0,30; A=2,25 m2; Crr=0,009; eta=22 %", ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15"]],
-  ["Véhicule BMW X5 4.8is", "m=2275 kg; Cd=0,38; A=2,74 m2; Crr=0,009; eta=22 %", ["X5_SPEC", "NHTSA", "NAP15"]],
-  ["Véhicule Dodge Ram 1500", "m=2366 kg; Cd=0,53; A=3,31 m2; Crr=0,009; eta=22 %", ["RAM_SPEC", "RAM_AREA", "NHTSA", "NAP15"]],
-  ["Air et gravité", "rho = 1,225 kg/m3; g = 9,80665 m/s2", ["ISA"]],
-  ["Essence", "PCI = 31,82 MJ/L, dérivé de 112114-116090 Btu/gal", ["DOE"]],
-  ["Prix essence Super U", "SP95-E10 = 1,989 €/L; flux consulté le 06/05/2026, dernier relevé station du 25/03/2026 09:38", ["FUELPRICE", "SUPERU"]],
-  ["CO2 essence", "8887 g CO2/gal = 2,35 kg CO2/L", ["EPA"]],
-  ["Pneus", "TSP = 0,0107 g/km x m/m_Note; PM10/TSP = 0,60; PM2,5/TSP = 0,42", ["EMEP", "BEDDOWS"]],
-  ["Freins", "TSP = 0,0142 g/km x m/m_Note x max(1, max_25..V(Efrein + Ecin_perdue)/(Efrein_45 + Ecin_perdue_45)); PM10/TSP = 0,98; PM2,5/TSP = 0,39", ["EMEP", "BRAKE", "BEDDOWS"]],
-  ["Chaussée", "TSP = 0,0150 g/km x m/m_Note; PM10/TSP = 0,50; PM2,5/TSP = 0,27", ["EMEP", "BEDDOWS"]],
-  ["PM échappement essence", "1,4 mg/km; PM échappement ajouté à PM10 total et PM2,5 total", ["EMEP_EXHAUST"]],
-  ["Spatialisation freins", "Part de PM freinage proportionnelle à l'énergie dissipée localement", ["BRAKE", "EMEP"]],
+  ["Véhicule Nissan Note", "m=1118 kg; Cd=0,30; A=2,25 m2; Crr=0,009; cyl. 1,4 L", ["AUTOEVO", "CARSPECTOR", "NHTSA", "NAP15"]],
+  ["Véhicule BMW X5 4.8is", "m=2275 kg; Cd=0,38; A=2,74 m2; Crr=0,009; cyl. 4,8 L", ["X5_SPEC", "NHTSA", "NAP15"]],
+  ["Véhicule Dodge Ram 1500", "m=2366 kg; Cd=0,53; A=3,31 m2; Crr=0,009; cyl. 5,7 L", ["RAM_SPEC", "RAM_AREA", "NHTSA", "NAP15"]],
+  ["Carburant moteur", "Par segment: dF = max(F_roue,0) ds / (eta_dt eta_ind PCI) + (k_idle x cyl x dt) si moteur non en DFCO, avec eta_dt = 0,85, eta_ind = 0,40, k_idle = 0,21 g/s/L. F_total = somme des dF segments + ralenti à l'arrêt + démarrage à froid", ["WILLANS", "EPA_DRIVELINE", "IDLE_FUEL", "NAP15", "DOE"]],
+  ["Charge utile", "m_eff = m_à_vide + payload (curseur Avancé, défaut 75 kg = un conducteur). m_eff entre dans F_roll, F_grade, F_inertia et l'échelle massique des PM pneus / chaussée", ["AUTOEVO", "X5_SPEC", "RAM_SPEC"]],
+  ["Ralenti à l'arrêt", "Carburant_ralenti = n_anchors x parkingIdle x k_idle x cylindrée; n_anchors = 2 (sens unique) ou 3 (aller-retour: départ + demi-tour + arrivée). Ajoute du temps mais aucun travail aux roues. Curseur Avancé, défaut 30 s", ["IDLE_FUEL"]],
+  ["Démarrage à froid", "Fenêtre froide T_cs (curseur Avancé, défaut 60 s; doublée si 'deux trajets séparés'). Carburant_froid = 0,30 x carburant_intégré_dans_T_cs (intégration au régime instantané, pas pro rata du temps). PM échappement = facteur_véhicule x masse_carburant x [(1 - f_carb_froid) + f_carb_froid x 1,30 x 7], avec f_carb_froid = part du carburant brûlée dans la fenêtre froide", ["EMEP_EXHAUST", "COLD_START"]],
+  ["Profil aller-retour", "Aller-retour = montée à plafond ferme (identique au sens 'up') + descente en roue libre; un seul démarrage à froid par défaut, deux si l'option 'Aller-retour = deux trajets séparés' est cochée dans Avancé", ["DYN", "COMFORT", "COLD_START"]],
+  ["Air et gravité", "rho(h) = 1,225 (1 - 2,2557e-5 h)^4,2559 kg/m3; g = 9,80665 m/s2", ["ISA", "ISA_DENSITY"]],
+  ["Essence", "PCI = 31,82 MJ/L, dérivé de 112114-116090 Btu/gal; densité 0,745 kg/L", ["DOE"]],
+  ["Prix essence", "Carburant_cost = carburant x prix_curseur. Curseur Avancé, défaut 1,989 €/L (relevé station Super U Passy 25/03/2026 via flux prix-carburants.gouv.fr)", ["FUELPRICE", "SUPERU"]],
+  ["CO2 essence E10", "CO2 = carburant x 2,21 kg CO2/L (ADEME Base Carbone, combustion TtW; le surcoût démarrage à froid est inclus via carburant)", ["ADEME_E10"]],
+  ["Pneus", "TSP = 0,0107 g/km x m_eff/m_Note; PM10/TSP = 0,60; PM2,5/TSP = 0,42; échelle massique inclut la charge utile", ["EMEP", "BEDDOWS"]],
+  ["Freins", "TSP = 0,0102 g/MJ x energie_plaquettes (post freinage moteur, post inertie rotative); PM10/TSP = 0,98; PM2,5/TSP = 0,39", ["HAGINO", "BRAKE", "EMEP"]],
+  ["Chaussée", "TSP = 0,0150 g/km x m_eff/m_Note; PM10/TSP = 0,50; PM2,5/TSP = 0,27", ["EMEP", "BEDDOWS"]],
+  ["PM échappement essence", "PM = facteur_véhicule x masse_carburant_warm x multiplicateur_froid (cf. Démarrage à froid); facteurs: 25 mg/kg (Note Euro 5), 90 mg/kg (Ram Tier 2), 120 mg/kg (X5 Euro 3)", ["EMEP_EXHAUST", "EMEP_TIER3", "EMEP_EURO_TIERS"]],
+  ["Freinage moteur", "F_eb = 10 N.s/(m.L) x cylindrée x v; min(overrun, F_eb) absorbé par moteur (sans carburant si DFCO actif), residu -> freins de friction", ["ENGINE_BRAKE"]],
+  ["Spatialisation freins", "Par segment: PM10_local = E_plaquettes_segment / 1e6 x 0,0102 x 0,98 x 1000 (mg); PM2,5_local idem avec 0,39", ["HAGINO", "BRAKE"]],
 ];
 
 const els = {};
 let state = { ...DEFAULTS };
 
-document.addEventListener("DOMContentLoaded", () => {
+if (typeof document !== "undefined") document.addEventListener("DOMContentLoaded", () => {
   [
     "speedA",
     "speedB",
     "latAccel",
     "longAccel",
+    "coldStart",
+    "payload",
+    "parkingIdle",
+    "fuelPrice",
   ].forEach((id) => {
     els[id] = document.getElementById(id);
     els[`${id}Out`] = document.getElementById(`${id}Out`);
@@ -457,6 +605,15 @@ document.addEventListener("DOMContentLoaded", () => {
       update();
     });
   });
+
+  const twoTripsEl = document.getElementById("twoTrips");
+  if (twoTripsEl) {
+    twoTripsEl.checked = state.twoTrips;
+    twoTripsEl.addEventListener("change", () => {
+      state.twoTrips = twoTripsEl.checked;
+      update();
+    });
+  }
 
   document.querySelectorAll("[data-vehicle]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -481,6 +638,7 @@ document.addEventListener("DOMContentLoaded", () => {
     Object.entries(DEFAULTS).forEach(([key, value]) => {
       if (els[key]) els[key].value = value;
     });
+    if (twoTripsEl) twoTripsEl.checked = state.twoTrips;
     document.querySelectorAll("[data-direction]").forEach((button) => {
       button.classList.toggle("is-active", button.dataset.direction === state.direction);
     });
@@ -520,18 +678,35 @@ function syncOutputs() {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })} m/s2`;
+  document.getElementById("coldStartOut").textContent = `${fr.format(state.coldStart)} s`;
+  document.getElementById("payloadOut").textContent = `${fr.format(state.payload)} kg`;
+  document.getElementById("parkingIdleOut").textContent = `${fr.format(state.parkingIdle)} s`;
+  document.getElementById("fuelPriceOut").textContent = `${state.fuelPrice.toLocaleString("fr-FR", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} €/L`;
 }
 
 function getParams() {
   const vehicle = VEHICLES[state.vehicleId] || VEHICLES.note;
   return {
-    mass: vehicle.mass,
+    // Effective mass m_eff = m_curb + payload (LEDGER row "Charge utile"). Used in:
+    //   F_roll  = Crr(v) m_eff g cos(theta)
+    //   F_grade = m_eff g sin(theta)
+    //   F_inertia = m_eff (1 + lambda) acc          [ROT_INERTIA]
+    //   tyre_PM, road_PM scale linearly via m_eff / m_Note  [BEDDOWS]
+    mass: vehicle.mass + state.payload,
+    curbMass: vehicle.mass,
     cd: vehicle.cd,
     area: vehicle.area,
     crr: vehicle.crr,
-    efficiency: vehicle.efficiency,
+    displacementL: vehicle.displacementL,
+    exhaustPmMgPerKgFuel: vehicle.exhaustPmMgPerKgFuel,
+    maxPowerW: vehicle.maxPowerW,
+    pmaxSpeedMps: vehicle.pmaxSpeedMps,
     latAccel: state.latAccel,
     longAccel: state.longAccel,
+    coldStartSeconds: state.coldStart,
+    parkingIdleSeconds: state.parkingIdle,
+    fuelPriceEurPerL: state.fuelPrice,
+    twoTrips: state.twoTrips,
   };
 }
 
@@ -545,7 +720,9 @@ function initVehicleTooltips() {
       ["Cd", fmt(vehicle.cd, 2, "")],
       ["Surface", fmt(vehicle.area, 2, " m2")],
       ["Crr", fmt(vehicle.crr, 3, "")],
-      ["Rendement", fmt(vehicle.efficiency * 100, 0, " %")],
+      ["Cylindrée", fmt(vehicle.displacementL, 1, " L")],
+      ["Puissance", fmt(vehicle.maxPowerW / 1000, 0, " kW")],
+      ["Norme", `${vehicle.euroTier} (${fmt(vehicle.exhaustPmMgPerKgFuel, 0, " mg PM/kg")})`],
       ["Sources", vehicle.sources.join(" / ")],
     ];
     const tooltipId = `vehicle-tooltip-${button.dataset.vehicle}`;
@@ -651,25 +828,50 @@ function reverseSpeedLimits(limits, totalKm) {
 function buildSpeedProfile(targetKmh, params, route, n) {
   const targetMps = kmhToMps(targetKmh);
   const minSpeed = kmhToMps(5);
-  const cruiseIsHardCap = route.direction === "up";
+  const oneWayM = ROUTE.distanceM;
+  // Hard cap means the cruise slider is enforced as an upper bound during the climb;
+  // soft cap (the descent coasting profile) lets the car coast above it. A round trip
+  // is climb-then-descent, so the climb half (m < oneWayM) is hard-capped, the descent
+  // half is soft-capped — same physics as picking "up" then "down" separately.
+  const isHardCapAt = (m) => (
+    route.direction === "up"
+    || (route.direction === "round" && m <= oneWayM)
+  );
   const points = [];
 
   for (let i = 0; i <= n; i += 1) {
     const m = (route.distanceM * i) / n;
     const km = m / 1000;
     const speedLimitMps = kmhToMps(speedLimitAt(route, km));
-    let speedMps = cruiseIsHardCap ? Math.min(targetMps, speedLimitMps) : speedLimitMps;
+    let speedMps = isHardCapAt(m) ? Math.min(targetMps, speedLimitMps) : speedLimitMps;
 
     route.curves.forEach((curve) => {
       const curveM = curve.km * 1000;
       const curveSpeedLimitMps = kmhToMps(speedLimitAt(route, curve.km));
       const curveCap = Math.min(
-        cruiseIsHardCap ? targetMps : Number.POSITIVE_INFINITY,
+        isHardCapAt(curveM) ? targetMps : Number.POSITIVE_INFINITY,
         curveSpeedLimitMps,
         Math.sqrt(params.latAccel * curve.radiusM),
       );
-      const gap = Math.abs(curveM - m);
-      const approachLimit = Math.sqrt(curveCap * curveCap + 2 * params.longAccel * gap);
+      // The curve-cap holds across the full arc length R x angle, not just at the apex,
+      // so a fast vehicle cannot exceed it while still inside the bend. See CURVE.
+      const arcLengthM = curve.radiusM * Math.abs(curve.angleDeg) * (Math.PI / 180);
+      const halfArcM = arcLengthM / 2;
+      if (m >= curveM - halfArcM && m <= curveM + halfArcM) {
+        speedMps = Math.min(speedMps, curveCap);
+        return;
+      }
+      // Approach lookahead before the curve; departure (after curveM + halfArc) is handled
+      // by the forward pass with engine-power-limited acceleration. Effective decel is
+      // gravity-aided uphill and gravity-opposed downhill; clamp >= 0.5 m/s2 so very
+      // steep slopes still allow a stop. See COMFORT.
+      if (m > curveM) return;
+      const approachStartM = curveM - halfArcM;
+      const elevHere = interpolateElevation(route.points, km);
+      const elevCurve = interpolateElevation(route.points, curve.km);
+      const slopeTheta = Math.atan2(elevCurve - elevHere, Math.max(approachStartM - m, 0.1));
+      const decel = Math.max(0.5, params.longAccel + CONSTANTS.g * Math.sin(slopeTheta));
+      const approachLimit = Math.sqrt(curveCap * curveCap + 2 * decel * (approachStartM - m));
       speedMps = Math.min(speedMps, approachLimit);
     });
 
@@ -682,40 +884,114 @@ function buildSpeedProfile(targetKmh, params, route, n) {
     });
   }
 
-  for (let i = 1; i < points.length; i += 1) {
-    const ds = points[i].m - points[i - 1].m;
-    const accelLimit = Math.sqrt(points[i - 1].speedMps * points[i - 1].speedMps + 2 * params.longAccel * ds);
-    points[i].speedMps = Math.min(points[i].speedMps, accelLimit);
+  // Vehicle starts at the Super U car park, ends at the maison médicale, and (round trip)
+  // halts at the turnaround. Anchoring v=0 here lets the kinematic passes ramp the speeds
+  // to and from rest with the launch fuel and brake events the cruise-only model missed.
+  points[0].speedMps = 0;
+  points[points.length - 1].speedMps = 0;
+  if (route.direction === "round") {
+    points[findIndexNearestM(points, ROUTE.distanceM)].speedMps = 0;
   }
 
+  // Forward pass: accel is min(comfort, engine-limited at this slope and speed). Heavy
+  // vehicles cannot match the comfort target uphill at high v. See EU_POWER.
+  // powerLimitedM accumulates ds for segments where the engine cap actually lowered the
+  // next speed: poweredAccel < comfort AND the resulting cap is below what the curve
+  // / limit / slider had already set. A car cruising under a tight curve cap with low
+  // demand is therefore not flagged.
+  //
+  // We run forward then backward, then forward once more (Gauss-Seidel sweep): the
+  // backward pass can lower v_i, which means the previous forward result for v_{i+1}
+  // may no longer be reachable from the new v_i. Re-running forward enforces kinematic
+  // consistency. The diagnostic powerLimitedM is taken from the final forward pass.
+  const runForwardPass = () => {
+    let limited = 0;
+    for (let i = 1; i < points.length; i += 1) {
+      const a = points[i - 1];
+      const b = points[i];
+      const ds = b.m - a.m;
+      const theta = Math.atan2(b.elev - a.elev, Math.max(ds, 0.1));
+      const rho = airDensity((a.elev + b.elev) / 2);
+      const aPowered = poweredAccel(params, a.speedMps, theta, rho);
+      const accelEff = Math.min(params.longAccel, aPowered);
+      const accelLimit = Math.sqrt(Math.max(0, a.speedMps * a.speedMps + 2 * accelEff * ds));
+      const cappedSpeed = Math.max(minSpeed, accelLimit);
+      if (aPowered < params.longAccel && cappedSpeed < points[i].speedMps - 1e-6) {
+        limited += ds;
+      }
+      points[i].speedMps = Math.min(points[i].speedMps, cappedSpeed);
+    }
+    return limited;
+  };
+
+  runForwardPass();
+
+  // Backward pass: comfort decel adjusted for slope (uphill braking is gravity-aided,
+  // downhill is gravity-opposed). Clamp >= 0.5 m/s2 to keep stops feasible on steep grades.
   for (let i = points.length - 2; i >= 0; i -= 1) {
-    const ds = points[i + 1].m - points[i].m;
-    const brakeLimit = Math.sqrt(points[i + 1].speedMps * points[i + 1].speedMps + 2 * params.longAccel * ds);
+    const a = points[i];
+    const b = points[i + 1];
+    const ds = b.m - a.m;
+    const theta = Math.atan2(b.elev - a.elev, Math.max(ds, 0.1));
+    const decelEff = Math.max(0.5, params.longAccel + CONSTANTS.g * Math.sin(theta));
+    const brakeLimit = Math.sqrt(b.speedMps * b.speedMps + 2 * decelEff * ds);
     points[i].speedMps = Math.min(points[i].speedMps, brakeLimit);
   }
 
-  if (!cruiseIsHardCap) {
-    return applyCoastingDescentProfile(points, targetMps, params);
-  }
+  // Second forward pass: enforces engine-cap kinematic consistency after the backward
+  // pass possibly lowered some v_i. Final powerLimitedM comes from this pass.
+  const powerLimitedM = runForwardPass();
 
-  return points;
+  if (route.direction === "up") return { points, powerLimitedM };
+
+  // Descent or round trip: apply the coasting profile only to the descent half. For a
+  // round trip, the uphill leg stays under the hard cap from isHardCapAt above — same
+  // physics as picking the dedicated "up" direction. The descent leg starts at the
+  // turnaround point, where the speed was anchored to 0 above.
+  const coastStartIdx = route.direction === "round"
+    ? findIndexNearestM(points, ROUTE.distanceM)
+    : 0;
+  const coastedPoints = applyCoastingDescentProfile(points, targetMps, params, coastStartIdx);
+  return { points: coastedPoints, powerLimitedM };
 }
 
-function applyCoastingDescentProfile(capPoints, targetMps, params) {
+function findIndexNearestM(points, targetM) {
+  let nearest = 0;
+  for (let i = 1; i < points.length; i += 1) {
+    if (Math.abs(points[i].m - targetM) < Math.abs(points[nearest].m - targetM)) nearest = i;
+  }
+  return nearest;
+}
+
+// On a descent the cruise slider acts as a soft cap: the car coasts above it but powers
+// up to it when coasting drag would slow the car below. Curve and limit caps were already
+// pre-applied by the backward pass in buildSpeedProfile, so the Math.min below preserves
+// them — do not "fix" by removing the clamp. See DYN.
+//
+// For round trips, startIdx points at the turnaround; the uphill half keeps the hard-cap
+// result from the forward pass (same physics as a one-way "up" trip).
+function applyCoastingDescentProfile(capPoints, targetMps, params, startIdx) {
   const minSpeed = kmhToMps(5);
   const points = capPoints.map((point) => ({ ...point }));
-  points[0].speedMps = Math.min(points[0].speedMps, Math.max(minSpeed, targetMps));
 
-  for (let i = 1; i < points.length; i += 1) {
+  for (let i = startIdx + 1; i < points.length; i += 1) {
     const previous = points[i - 1];
     const point = points[i];
     const ds = point.m - previous.m;
+    const dsForSlope = Math.max(ds, 0.1);
+    const theta = Math.atan2(point.elev - previous.elev, dsForSlope);
+    const rho = airDensity((previous.elev + point.elev) / 2);
     const freeAccel = coastingAcceleration(previous.speedMps, previous, point, params);
     const freeSpeed = Math.sqrt(Math.max(minSpeed * minSpeed, previous.speedMps * previous.speedMps + 2 * freeAccel * ds));
     let nextSpeed = freeSpeed;
 
     if (freeSpeed < targetMps) {
-      const poweredSpeed = Math.sqrt(previous.speedMps * previous.speedMps + 2 * params.longAccel * ds);
+      // Powered ramp toward the cruise target, capped by what the engine can deliver at
+      // this slope and speed. Without this cap a heavy SUV would accelerate uphill at the
+      // comfort target in round-trip mode. See EU_POWER.
+      const aPowered = poweredAccel(params, previous.speedMps, theta, rho);
+      const aEff = Math.max(0, Math.min(params.longAccel, aPowered));
+      const poweredSpeed = Math.sqrt(previous.speedMps * previous.speedMps + 2 * aEff * ds);
       nextSpeed = Math.max(freeSpeed, Math.min(targetMps, poweredSpeed));
     }
 
@@ -725,15 +1001,37 @@ function applyCoastingDescentProfile(capPoints, targetMps, params) {
   return points;
 }
 
+// Instantaneous coasting deceleration at speedMps on the slope between a and b.
+// Note: this evaluates aero and rolling at the *point* speed, while simulate() integrates
+// work over space using the spatial mean <v^2> = (v_a^2 + v_b^2) / 2. Both are correct
+// for what they compute (instantaneous decel here vs. integrated work there); the
+// asymmetry is intentional. See DYN, MICHELIN_CRR.
 function coastingAcceleration(speedMps, a, b, params) {
   const ds = Math.max(b.m - a.m, 0.1);
   const dh = b.elev - a.elev;
   const theta = Math.atan2(dh, ds);
   const speed = Math.max(speedMps, kmhToMps(3));
-  const fRoll = params.crr * params.mass * CONSTANTS.g * Math.cos(theta);
-  const fAero = 0.5 * CONSTANTS.rho * params.cd * params.area * speed * speed;
+  const rho = airDensity((a.elev + b.elev) / 2);
+  const fRoll = effectiveCrr(params.crr, speed) * params.mass * CONSTANTS.g * Math.cos(theta);
+  const fAero = 0.5 * rho * params.cd * params.area * speed * speed;
   const fGrade = params.mass * CONSTANTS.g * Math.sin(theta);
   return -(fRoll + fAero + fGrade) / params.mass;
+}
+
+// Maximum forward acceleration the powertrain can deliver at speed v on slope theta.
+// Force model: constant maximum torque below v_Pmax, constant power above. This avoids
+// the unphysical infinite force that P_max/v would imply at v -> 0. The peak power is
+// also derated by air density (naturally aspirated engines lose ~1 %/100 m). The comfort
+// accel from the slider is then clamped by this so heavy SUVs cannot accelerate uphill
+// at the same rate as the Note. See EU_POWER, EPA_DRIVELINE, TORQUE_CURVE, SAE_J1349.
+function poweredAccel(params, speedMps, theta, rho) {
+  const v = Math.max(speedMps, kmhToMps(5));
+  const fRoll = effectiveCrr(params.crr, v) * params.mass * CONSTANTS.g * Math.cos(theta);
+  const fAero = 0.5 * rho * params.cd * params.area * v * v;
+  const fGrade = params.mass * CONSTANTS.g * Math.sin(theta);
+  const pAvail = params.maxPowerW * CONSTANTS.drivetrainEfficiency * (rho / CONSTANTS.rho0);
+  const fAvail = pAvail / Math.max(params.pmaxSpeedMps || 30, v);
+  return (fAvail - fRoll - fAero - fGrade) / params.mass;
 }
 
 function speedLimitAt(route, km) {
@@ -744,18 +1042,53 @@ function speedLimitAt(route, km) {
 }
 
 function simulate(targetKmh, params, route) {
-  const n = 260;
+  // Segment count proportional to route length so a round trip uses the same ds as a
+  // one-way trip (~39 m). Otherwise n = 260 forced round trips into 79 m segments and
+  // accumulated discretization error: round trip stopped equaling up + down.
   const distanceM = route.distanceM;
-  const points = buildSpeedProfile(targetKmh, params, route, n);
+  const n = Math.max(2, Math.round(distanceM / 39.4));
+  const profile = buildSpeedProfile(targetKmh, params, route, n);
+  const points = profile.points;
+  // Diagnostic: distance over which the forward pass actually lowered the next speed
+  // because the engine cap (poweredAccel < comfort) was tighter than the curve / limit /
+  // slider cap. Cars cruising under a tight curve cap with low demand are not flagged.
+  // See EU_POWER, TORQUE_CURVE.
+  const powerLimitedDistanceM = profile.powerLimitedM;
 
   let tractionJ = 0;
-  let brakeJ = 0;
+  let brakeJ = 0;        // friction-brake (pad) work only, after engine-brake share is removed
+  let engineBrakeJ = 0;  // diagnostic: energy dissipated in the engine while coasting
   let aeroJ = 0;
   let rollJ = 0;
   let climbJ = 0;
   let inertiaJ = 0;
-  let decelJ = 0;
   let timeS = 0;
+  // Per-segment fuel is accumulated directly so the cold-start window can integrate the
+  // *actual* fuel rate during the launch (which is 3-5x the trip mean on routes whose
+  // first km is the climb) rather than a time pro-rata of the trip-mean rate.
+  //
+  // Per-segment Willans formula (see LEDGER row "Carburant moteur"):
+  //   dF_segment = max(F_wheel, 0) ds / (eta_dt eta_ind PCI)
+  //              + (k_idle x cylindree x dt) [si non-DFCO]
+  //
+  // The cold-window accumulator uses the same dF, weighted by the share of dt that
+  // falls inside [0, coldEndS]. See WILLANS, IDLE_FUEL, COLD_START.
+  let warmFuelL = 0;
+  let coldWindowFuelL = 0;
+  // The "deux trajets séparés" toggle doubles the cold window for round trips: the
+  // engine cools at the turnaround, so the descent leg gets its own catalyst light-off.
+  // The doubling is applied to the *single* window length so it still integrates the
+  // launch's high fuel rate correctly (there's no second "launch" — just a longer cold
+  // window — but for trip totals the two are interchangeable). See COLD_START.
+  const tripCountForColdStart = (route.direction === "round" && params.twoTrips) ? 2 : 1;
+  const coldEndS = tripCountForColdStart * (params.coldStartSeconds || 0);
+  const fuelDensityKgL = CONSTANTS.gasolineDensityKgPerL;
+  // Idle fuel rate per second: k_idle [g/s/L] x cylindree [L] / density [g/L].
+  const idleRateLPerS = (CONSTANTS.idleFuelGPerSPerL * params.displacementL) / (fuelDensityKgL * 1000);
+  const fuelLhvJ = CONSTANTS.gasolineLhvMJPerL * 1e6;
+  // eta_dt x eta_ind x PCI: divisor that converts wheel work [J] to fuel volume [L].
+  const fuelDivisor = CONSTANTS.drivetrainEfficiency * CONSTANTS.indicatedEfficiency * fuelLhvJ;
+  let idleSecondsS = 0;
   const brakeBySegment = [];
 
   for (let i = 0; i < n; i += 1) {
@@ -767,36 +1100,95 @@ function simulate(targetKmh, params, route) {
     const vAvg = Math.max((a.speedMps + b.speedMps) / 2, kmhToMps(3));
     const acc = (b.speedMps * b.speedMps - a.speedMps * a.speedMps) / (2 * ds);
 
-    const fRoll = params.crr * params.mass * CONSTANTS.g * Math.cos(theta);
-    const fAero = 0.5 * CONSTANTS.rho * params.cd * params.area * vAvg * vAvg;
+    // For aero and the v^2 part of Crr(v), integrate over space: the spatial mean of v^2
+    // for constant-accel kinematics is (v_a^2 + v_b^2) / 2, NOT vAvg^2 (Jensen's
+    // inequality - the launch segment is otherwise undercounted by 2x).
+    const vSqMean = (a.speedMps * a.speedMps + b.speedMps * b.speedMps) / 2;
+    const rho = airDensity((a.elev + b.elev) / 2);
+    const crrV = params.crr * (1 + vSqMean / (CONSTANTS.crrSpeedRefMps * CONSTANTS.crrSpeedRefMps));
+    const fRoll = crrV * params.mass * CONSTANTS.g * Math.cos(theta);
+    const fAero = 0.5 * rho * params.cd * params.area * vSqMean;
     const fGrade = params.mass * CONSTANTS.g * Math.sin(theta);
-    const fInertia = params.mass * acc;
+    // Rotational inertia of wheels + driveline acts like extra translational mass during
+    // acceleration. See ROT_INERTIA.
+    const fInertia = params.mass * (1 + CONSTANTS.rotInertiaLambda) * acc;
     const fWheel = fRoll + fAero + fGrade + fInertia;
+    const dt = ds / vAvg;
+
+    // When wheels pull (fWheel > 0), engine drives the car. When wheels overrun the engine
+    // (fWheel < 0), some of the deceleration is absorbed by the engine itself (pumping +
+    // FMEP) and only the residual feeds the friction brakes. See ENGINE_BRAKE.
+    const fEngineBrake = CONSTANTS.engineBrakeNPerLPerMps * params.displacementL * vAvg;
+    const overrun = Math.max(-fWheel, 0);
+    const fEngineAbsorbed = Math.min(overrun, fEngineBrake);
+    const fFrictionBrake = overrun - fEngineAbsorbed;
 
     tractionJ += Math.max(fWheel, 0) * ds;
-    brakeJ += Math.max(-fWheel, 0) * ds;
+    brakeJ += fFrictionBrake * ds;
+    engineBrakeJ += fEngineAbsorbed * ds;
     aeroJ += fAero * ds;
     rollJ += fRoll * ds;
     climbJ += Math.max(fGrade, 0) * ds;
     inertiaJ += Math.max(fInertia, 0) * ds;
-    decelJ += Math.max(-fInertia, 0) * ds;
-    timeS += ds / vAvg;
+
+    // Per-segment Willans-line fuel: traction work / (eta_dt * eta_ind * Hu) plus idle
+    // when not in DFCO. See WILLANS, IDLE_FUEL.
+    const segTractionFuelL = (Math.max(fWheel, 0) * ds) / fuelDivisor;
+    const segIdleFuelL = (fWheel > 0 || vAvg < kmhToMps(CONSTANTS.dfcoMinKmh))
+      ? idleRateLPerS * dt
+      : 0;
+    const segFuelL = segTractionFuelL + segIdleFuelL;
+    warmFuelL += segFuelL;
+    if (timeS < coldEndS) {
+      // The cold window may span only part of this segment.
+      const fracInWindow = Math.min(1, (coldEndS - timeS) / Math.max(dt, 1e-9));
+      coldWindowFuelL += segFuelL * fracInWindow;
+    }
+    timeS += dt;
+    if (fWheel > 0 || vAvg < kmhToMps(CONSTANTS.dfcoMinKmh)) {
+      idleSecondsS += dt;
+    }
     brakeBySegment.push({
       km: (a.km + b.km) / 2,
-      energyJ: Math.max(-fWheel, 0) * ds,
+      energyJ: fFrictionBrake * ds,
     });
   }
 
-  const fuelEnergyJ = tractionJ / Math.max(params.efficiency, 0.01);
-  const fuelL = fuelEnergyJ / (CONSTANTS.gasolineLhvMJPerL * 1e6);
-  const fuelCostEur = fuelL * CONSTANTS.fuelPriceEurPerL;
+  // Parking idle: engine on at v=0 anchors. Formula (LEDGER row "Ralenti à l'arrêt"):
+  //   carburant_ralenti = n_anchors x parkingIdle x k_idle x cylindree
+  // n_anchors = 2 (one-way: départ + arrivée) or 3 (aller-retour: départ + demi-tour
+  // + arrivée). Adds time too, but no kinematic work. See IDLE_FUEL.
+  const idleAnchorCount = route.direction === "round" ? 3 : 2;
+  const parkingIdleS = idleAnchorCount * (params.parkingIdleSeconds || 0);
+  const parkingIdleFuelL = idleRateLPerS * parkingIdleS;
+  warmFuelL += parkingIdleFuelL;
+  // Parking idle is treated as occurring before / after the trip; it is included in the
+  // cold window only to the extent that coldEndS exceeds the moving time.
+  if (timeS < coldEndS) {
+    const remainingCold = Math.min(parkingIdleS, coldEndS - timeS);
+    coldWindowFuelL += idleRateLPerS * remainingCold;
+  }
+  timeS += parkingIdleS;
+  idleSecondsS += parkingIdleS;
+
+  // Cold-start surcharge: during the cold window the engine burns +30 % more fuel and
+  // the catalyst lets through ~7x exhaust PM. coldFractionByFuel is the share of warm
+  // fuel actually burned during the first coldStartSeconds, so the launch (high
+  // instantaneous fuel rate) gets the right weight - unlike the previous time pro-rata.
+  // See COLD_START.
+  const coldFractionByFuel = warmFuelL > 0 ? coldWindowFuelL / warmFuelL : 0;
+  const coldStartFuelL = coldWindowFuelL * 0.30;
+  const fuelL = warmFuelL + coldStartFuelL;
+  const fuelPriceEurPerL = (params.fuelPriceEurPerL ?? CONSTANTS.fuelPriceEurPerL);
+  const fuelCostEur = fuelL * fuelPriceEurPerL;
   const distanceKm = distanceM / 1000;
   const avgKmh = (distanceKm / (timeS / 3600));
   const massScale = params.mass / VEHICLES.note.mass;
-  const brakeDemandJ = brakeJ + decelJ;
-  const brakeEnergyMultiplier = estimateBrakeDemandMultiplier(targetKmh, params, route, brakeDemandJ);
+  // Tyre and road wear keep the EMEP/Beddows mass-scaled km factors; brake wear is now
+  // tied to the friction-brake work computed above (HAGINO), which already encodes mass,
+  // speed and grade through brakeJ.
   const tyreTsp = distanceKm * CONSTANTS.tyreTspGKm * massScale;
-  const brakeTsp = distanceKm * CONSTANTS.brakeTspGKm * massScale * brakeEnergyMultiplier;
+  const brakeTsp = (brakeJ / 1e6) * CONSTANTS.brakeTspGPerMJ;
   const roadTsp = distanceKm * CONSTANTS.roadTspGKm * massScale;
   const pm10G =
     tyreTsp * CONSTANTS.tyrePM10 +
@@ -806,14 +1198,36 @@ function simulate(targetKmh, params, route) {
     tyreTsp * CONSTANTS.tyrePM25 +
     brakeTsp * CONSTANTS.brakePM25 +
     roadTsp * CONSTANTS.roadPM25;
-  const exhaustPmMg = distanceKm * CONSTANTS.exhaustPmMgKm;
+  // Tier 3 EMEP: PM échappement = facteur_véhicule x masse_carburant_warm.
+  // Pendant la fenêtre démarrage à froid, le catalyseur n'est pas amorcé, donc *toute*
+  // la fuel brûlée durant ces secondes (baseline + surconsommation +30 %) émet ~7x plus
+  // de PM. Formule:
+  //
+  //   exhaustPmMg = facteur_véhicule x masse_carburant_warm x mult_froid
+  //   mult_froid  = (1 - f_carb_froid) + f_carb_froid x 1,30 x 7
+  //   f_carb_froid = coldWindowFuelL / warmFuelL
+  //
+  // mult_froid = 1 quand f = 0 (moteur chaud), = 9,1 quand f = 1 (trip entièrement
+  // dans la fenêtre froide). Pondérer seulement la surconsommation par 7x (bug
+  // initial) sous-évaluerait le total de ~20 %. See EMEP_TIER3, COLD_START.
+  const warmFuelKg = warmFuelL * CONSTANTS.gasolineDensityKgPerL;
+  const coldMultiplier = (1 - coldFractionByFuel) + coldFractionByFuel * 1.30 * 7;
+  const exhaustPmMg = warmFuelKg * params.exhaustPmMgPerKgFuel * coldMultiplier;
 
+  // Each segment's PM10 = energy_J x 1e-6 x brakeTspGPerMJ x brakePM10 (and similarly
+  // PM2.5). Equivalent to (energy / total) x total but avoids the divide-by-zero guard.
+  // See HAGINO.
   const brakeTotalPm10Mg = brakeTsp * CONSTANTS.brakePM10 * 1000;
-  const brakeEnergySum = brakeBySegment.reduce((sum, row) => sum + row.energyJ, 0);
-  const brakePmHotspots = brakeBySegment.map((row) => ({
-    km: row.km,
-    mg: brakeEnergySum > 0 ? (row.energyJ / brakeEnergySum) * brakeTotalPm10Mg : 0,
-  }));
+  const brakeTotalPm25Mg = brakeTsp * CONSTANTS.brakePM25 * 1000;
+  const brakePmHotspots = brakeBySegment.map((row) => {
+    const tspMg = (row.energyJ / 1e6) * CONSTANTS.brakeTspGPerMJ * 1000;
+    return {
+      km: row.km,
+      mg: tspMg * CONSTANTS.brakePM10,        // PM10, kept as `mg` for hotspot map back-compat
+      pm10Mg: tspMg * CONSTANTS.brakePM10,
+      pm25Mg: tspMg * CONSTANTS.brakePM25,
+    };
+  });
 
   return {
     targetKmh,
@@ -827,6 +1241,7 @@ function simulate(targetKmh, params, route) {
     co2Kg: fuelL * CONSTANTS.co2KgPerL,
     tractionKWh: tractionJ / 3.6e6,
     brakeKWh: brakeJ / 3.6e6,
+    engineBrakeKWh: engineBrakeJ / 3.6e6,
     aeroKWh: aeroJ / 3.6e6,
     rollKWh: rollJ / 3.6e6,
     climbKWh: climbJ / 3.6e6,
@@ -838,50 +1253,11 @@ function simulate(targetKmh, params, route) {
     totalPm25Mg: pm25G * 1000 + exhaustPmMg,
     tyrePm10Mg: tyreTsp * CONSTANTS.tyrePM10 * 1000,
     brakePm10Mg: brakeTotalPm10Mg,
+    brakePm25Mg: brakeTotalPm25Mg,
     roadPm10Mg: roadTsp * CONSTANTS.roadPM10 * 1000,
-    brakeEnergyMultiplier,
     brakePmHotspots,
+    powerLimitedKm: powerLimitedDistanceM / 1000,
   };
-}
-
-function estimateBrakeDemandMultiplier(targetKmh, params, route, currentDemandJ) {
-  const referenceDemandJ = estimateBrakeDemandOnly(CONSTANTS.pmReferenceKmh, params, route);
-  if (referenceDemandJ <= 1000) return 1;
-
-  let peakDemandJ = Math.max(referenceDemandJ, currentDemandJ);
-  const firstSpeed = CONSTANTS.pmMinKmh;
-  const lastSpeed = Math.max(firstSpeed, Math.ceil(targetKmh));
-
-  for (let speed = firstSpeed; speed <= lastSpeed; speed += 1) {
-    peakDemandJ = Math.max(peakDemandJ, estimateBrakeDemandOnly(speed, params, route));
-  }
-
-  return Math.max(1, peakDemandJ / referenceDemandJ);
-}
-
-function estimateBrakeDemandOnly(targetKmh, params, route) {
-  const n = 260;
-  const points = buildSpeedProfile(targetKmh, params, route, n);
-
-  let brakeJ = 0;
-  let decelJ = 0;
-  for (let i = 0; i < n; i += 1) {
-    const a = points[i];
-    const b = points[i + 1];
-    const ds = b.m - a.m;
-    const dh = b.elev - a.elev;
-    const theta = Math.atan2(dh, ds);
-    const vAvg = Math.max((a.speedMps + b.speedMps) / 2, kmhToMps(3));
-    const acc = (b.speedMps * b.speedMps - a.speedMps * a.speedMps) / (2 * ds);
-    const fRoll = params.crr * params.mass * CONSTANTS.g * Math.cos(theta);
-    const fAero = 0.5 * CONSTANTS.rho * params.cd * params.area * vAvg * vAvg;
-    const fGrade = params.mass * CONSTANTS.g * Math.sin(theta);
-    const fInertia = params.mass * acc;
-    brakeJ += Math.max(-(fRoll + fAero + fGrade + fInertia), 0) * ds;
-    decelJ += Math.max(-fInertia, 0) * ds;
-  }
-
-  return brakeJ + decelJ;
 }
 
 function interpolateElevation(points, km) {
@@ -901,6 +1277,19 @@ function interpolateElevation(points, km) {
 
 function kmhToMps(kmh) {
   return kmh / 3.6;
+}
+
+// ISA troposphere: ~10 % air-density drop between Passy (578 m) and Plateau d'Assy (1039 m).
+// See ISA_DENSITY.
+function airDensity(elevM) {
+  return CONSTANTS.rho0 * Math.pow(1 - CONSTANTS.isaLapse * elevM, CONSTANTS.isaExp);
+}
+
+// Crr grows quadratically with speed: Crr(v) = Crr0 (1 + (v/v_ref)^2) with
+// v_ref = crrSpeedRefMps. See MICHELIN_CRR.
+function effectiveCrr(crr0, speedMps) {
+  const r = speedMps / CONSTANTS.crrSpeedRefMps;
+  return crr0 * (1 + r * r);
 }
 
 function renderRouteFacts(route) {
@@ -955,7 +1344,7 @@ function renderMetrics(a, b) {
   const speedRefs = ["OSM", "LEGIFRANCE", "LEGIFRANCE_R4132"];
   const rows = [
     ["Carburant", "fuelL", " L", 2, true, ["DYN", "OTD", "CURVE", "COMFORT", "NAP15", "DOE", ...speedRefs, ...vehicleRefs], "Bilan longitudinal, rendement moteur et PCI essence.", "percent", "compact"],
-    [`Coût carburant <small>${fmt(CONSTANTS.fuelPriceEurPerL, 3, " €/L")}</small>`, "fuelCostEur", " €", 2, true, ["FUELPRICE", "DYN", "DOE", "NAP15", ...speedRefs, ...vehicleRefs], "Litres simulés multipliés par le prix SP95-E10 déclaré pour Super U Passy.", "absolute", "compact"],
+    [`Coût carburant <small>${fmt(state.fuelPrice, 3, " €/L")}</small>`, "fuelCostEur", " €", 2, true, ["FUELPRICE", "DYN", "DOE", "NAP15", ...speedRefs, ...vehicleRefs], "Litres simulés multipliés par le prix essence (curseur Avancé; défaut SP95-E10 Super U Passy 25/03/2026).", "absolute", "compact"],
     ["Consommation", "fuelLPer100", " L/100 km", 1, true, ["DYN", "OTD", "NAP15", "DOE", ...speedRefs, ...vehicleRefs], "Carburant simulé rapporté à la distance routière."],
     ["CO2 échappement", "co2Kg", " kg", 2, true, ["DYN", "DOE", "EPA", "NAP15", ...speedRefs, ...vehicleRefs], "Litres d'essence multipliés par le facteur CO2 essence."],
     ["PM10 total", "totalPm10Mg", " mg", 0, true, ["EMEP", "EMEP_EXHAUST", "BEDDOWS", "BRAKE", ...speedRefs, ...vehicleRefs], "PM10 hors échappement + PM échappement essence, assimilé à PM10."],
@@ -964,6 +1353,7 @@ function renderMetrics(a, b) {
     ["PM2,5 hors échappement", "pm25Mg", " mg", 0, true, ["EMEP", "BEDDOWS", "BRAKE", ...speedRefs, ...vehicleRefs], "Fractions PM2,5 appliquées aux émissions hors échappement."],
     ["Temps", "timeMin", " min", 1, true, ["OSM", "LEGIFRANCE", "CURVE", "COMFORT"], "Distance segmentée divisée par le profil de vitesse plafonné par les limites locales.", "absolute"],
     ["Vitesse moyenne", "avgKmh", " km/h", 1, false, ["OSM", "LEGIFRANCE", "CURVE", "COMFORT"], "Distance routière divisée par le temps simulé."],
+    ["Distance moteur saturé", "powerLimitedKm", " km", 2, true, ["EU_POWER", "TORQUE_CURVE", "SAE_J1349", ...vehicleRefs], "Distance sur laquelle le moteur ne peut pas tenir la consigne de confort (poweredAccel < longAccel); diagnostic des montées soutenues.", "absolute"],
   ];
 
   document.getElementById("metrics").innerHTML = rows
@@ -1468,4 +1858,21 @@ function fmt(value, digits = 0, suffix = "") {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   })}${suffix}`;
+}
+
+// Node-only export shim so the model can be driven by sensitivity.js without a browser.
+// `typeof module` is undefined in the browser; this block is therefore inert there.
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    CONSTANTS,
+    VEHICLES,
+    ROUTE,
+    simulate,
+    getDirectionalRoute,
+    buildSpeedProfile,
+    poweredAccel,
+    coastingAcceleration,
+    airDensity,
+    effectiveCrr,
+  };
 }
